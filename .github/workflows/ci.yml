@@ -27,4 +27,8 @@ jobs:
       # policies together.
       - run: pnpm sim -- --games 1500 --bots 2,1
       - run: pnpm sim -- --games 800 --bots 2,1,2
+      # Random house-rule combinations. This is the check that found both the
+      # transfer/cap hole and the position that never terminated.
+      - run: pnpm sim -- --games 3000 --matrix true --seed 111000
+      - run: pnpm sim -- --games 1200 --matrix true --bots 2,1 --seed 222000
       - run: pnpm build

@@ -21,7 +21,25 @@ pnpm test
 pnpm sim -- --games 10000     # fuzzer herného jadra
 pnpm sim -- --games 500 --bots 2,1   # to isté, ale hrajú boti
 pnpm duel -- --a 2 --b 1 --games 2000  # sila botov na párovaných rozdaniach
+pnpm sim -- --games 3000 --matrix true # náhodné kombinácie domácich pravidiel
 ```
+
+## Pravidlá
+
+Každá izba má vlastnú konfiguráciu (`RuleConfig`): 36 alebo 52 kariet, veľkosť ruky,
+strop stola, limit útoku (podľa ruky obrancu / bez limitu / pevný), limit prihadzovania
+po „beriem", kto smie prihadzovať (ktokoľvek / len susedia obrancu), prehadzovanie
+(perevodnoy) vrátane reťazenia a prehodenia ukázaním tromfu, kto začína, či obranca
+musí zbiť keď môže, a či je tromfová karta viditeľná.
+
+`validateConfig` odmieta nedealovateľné kombinácie (36 kariet so 6 hráčmi) a varuje
+pred tými, ktoré prekvapujú (napr. „obranca musí zbiť" mení hru viac, než sa zdá).
+
+**Hra vždy skončí.** Durak vie cyklovať — traja hráči, z ktorých každý nevie zbiť
+útok toho ďalšieho, si môžu kartu podávať dokola donekonečna. Ľudia to prelomia tým,
+že zahrajú inak; deterministickí boti nie a serverová izba by zamrzla. Preto je
+`MAX_BOUTS_WITHOUT_PROGRESS` súčasťou pravidiel: po 32 kolách bez toho, aby karta
+odišla do odhadzovacej kôpky alebo sa zmenšil balík, hra končí patom.
 
 ## Boti
 

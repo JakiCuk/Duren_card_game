@@ -37,6 +37,7 @@ export interface PlayerView {
   defenderTaking: boolean;
   defenderHandAtBoutStart: number;
   boutIndex: number;
+  transfersThisBout: number;
   finished: boolean;
   result: GameResult | null;
   /** Precomputed for `you`. Empty for spectators and for a finished game. */
@@ -74,8 +75,11 @@ export function redact(s: GameState, viewer: Seat | null): PlayerView {
     defenderTaking: s.defenderTaking,
     defenderHandAtBoutStart: s.defenderHandAtBoutStart,
     boutIndex: s.boutIndex,
+    transfersThisBout: s.transfersThisBout,
     finished: s.phase === 'finished',
-    result: s.result ? { durak: s.result.durak, order: s.result.order.slice() } : null,
+    result: s.result
+      ? { durak: s.result.durak, order: s.result.order.slice(), reason: s.result.reason }
+      : null,
     legalMoves: [],
   };
 
@@ -98,6 +102,7 @@ export function viewCtx(v: PlayerView): LegalityCtx {
     defenderTaking: v.defenderTaking,
     defenderHandAtBoutStart: v.defenderHandAtBoutStart,
     boutIndex: v.boutIndex,
+    transfersThisBout: v.transfersThisBout,
     passed: v.players.map((p) => p.passed),
     seats: v.players.map((p) => ({ seat: p.seat, handCount: p.handCount, out: p.out })),
     finished: v.finished,
@@ -110,6 +115,7 @@ export type PublicEvent =
   | { k: 'dealt'; trumpCard: CardId; hand: CardId[] | null }
   | { k: 'attack'; seat: Seat; card: CardId; throwIn: boolean }
   | { k: 'defend'; seat: Seat; card: CardId; slot: number }
+  | { k: 'transfer'; seat: Seat; to: Seat; card: CardId; revealed: boolean }
   | { k: 'takeDeclared'; seat: Seat }
   | { k: 'take'; seat: Seat; cards: CardId[] }
   | { k: 'pass'; seat: Seat }
@@ -144,9 +150,13 @@ export function redactEvent(e: GameEvent, viewer: Seat | null): PublicEvent {
     case 'bito':
       return { k: 'bito', cards: e.cards.slice() };
     case 'gameOver':
-      return { k: 'gameOver', result: { durak: e.result.durak, order: e.result.order.slice() } };
+      return {
+        k: 'gameOver',
+        result: { durak: e.result.durak, order: e.result.order.slice(), reason: e.result.reason },
+      };
     case 'attack':
     case 'defend':
+    case 'transfer':
     case 'takeDeclared':
     case 'trumpTaken':
     case 'out':

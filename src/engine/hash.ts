@@ -33,6 +33,8 @@ export function hashState(s: GameState): string {
   feed(s.boutIndex);
   feed(s.defenderTaking ? 1 : 0);
   feed(s.defenderHandAtBoutStart);
+  feed(s.transfersThisBout);
+  feed(s.boutsWithoutProgress);
   feed(s.rng.a);
   feed(s.rng.b);
   feed(s.rng.c);

@@ -15,6 +15,10 @@ export function describeEvent(e: GameEvent, name: (seat: number) => string): str
       return `${name(e.seat)} ${e.throwIn ? 'prihadzuje' : 'útočí'} ${cardCode(e.card)}.`;
     case 'defend':
       return `${name(e.seat)} zbíja kartou ${cardCode(e.card)}.`;
+    case 'transfer':
+      return e.revealed
+        ? `${name(e.seat)} ukazuje ${cardCode(e.card)} a prehadzuje útok na ${name(e.to)}.`
+        : `${name(e.seat)} prehadzuje ${cardCode(e.card)} na ${name(e.to)}.`;
     case 'takeDeclared':
       return `${name(e.seat)} berie.`;
     case 'take':
@@ -32,6 +36,7 @@ export function describeEvent(e: GameEvent, name: (seat: number) => string): str
     case 'out':
       return `${name(e.seat)} sa zbavil kariet.`;
     case 'gameOver':
+      if (e.result.reason === 'stalemate') return 'Patová pozícia — hra sa už nikam neposúvala.';
       return e.result.durak === null ? 'Remíza — nikto nie je durak.' : `Durak: ${e.result.durak}.`;
   }
 }

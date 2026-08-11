@@ -10,6 +10,7 @@ import {
   pickCheapest,
   rankCounts,
   takeMove,
+  transferMoves,
   unbeatenSlots,
   type Phase,
 } from './heuristics.js';
@@ -90,9 +91,22 @@ export function createLevel2Tuned(tuning: Level2Tuning): BotFactory {
 function decideDefence(view: PlayerView, tuning: Level2Tuning): Move | undefined {
   const defends = defendMoves(view);
   const take = takeMove(view);
-  if (defends.length === 0 && take === undefined) return undefined;
+  const transfers = transferMoves(view);
+  if (defends.length === 0 && take === undefined && transfers.length === 0) return undefined;
 
   const trump = view.trump;
+
+  // Handing the bout to the next player costs one card and ends our problem.
+  // Worth it for a card we would have thrown in anyway; never worth a trump,
+  // and never by revealing one, which tells the table exactly what we hold.
+  const handOff = pickCheapest(
+    transfers.filter(
+      (m) => !m.reveal && !isTrump(m.card, trump) && rankOf(m.card) <= tuning.throwInMax[phaseOf(view)],
+    ),
+    (c) => cardValue(c, trump),
+  );
+  if (handOff) return handOff;
+
   const open = unbeatenSlots(view);
 
   const cheapestPerSlot = open.map((slot) =>

@@ -27,6 +27,9 @@ export const attackMoves = (view: PlayerView): Extract<Move, { t: 'ATTACK' }>[] 
 export const defendMoves = (view: PlayerView): Extract<Move, { t: 'DEFEND' }>[] =>
   view.legalMoves.filter((m): m is Extract<Move, { t: 'DEFEND' }> => m.t === 'DEFEND');
 
+export const transferMoves = (view: PlayerView): Extract<Move, { t: 'TRANSFER' }>[] =>
+  view.legalMoves.filter((m): m is Extract<Move, { t: 'TRANSFER' }> => m.t === 'TRANSFER');
+
 export const takeMove = (view: PlayerView): Move | undefined =>
   view.legalMoves.find((m) => m.t === 'TAKE');
 

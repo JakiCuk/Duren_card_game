@@ -10,6 +10,12 @@ afterEach(cleanup);
 
 const seatPanels = () => screen.getAllByRole('region');
 
+/**
+ * The end-of-game banner. Queried by class rather than by text: the log prints
+ * a very similar sentence, and a text query would match both.
+ */
+const resultBanner = (): string | null => document.querySelector('.banner')?.textContent ?? null;
+
 type User = ReturnType<typeof userEvent.setup>;
 
 /**
@@ -148,7 +154,7 @@ describe('hot-seat board', () => {
     // If the UI ever fails to offer a move the game would stall here, which is
     // exactly the failure this test exists to catch.
     for (let step = 0; step < 400; step++) {
-      if (screen.queryByText(/^Durak je |^Remíza/)) break;
+      if (resultBanner() !== null) break;
 
       const cards = Array.from(document.querySelectorAll('.seat--active .hand button.card')).filter(
         (el) => !el.classList.contains('card--muted'),
@@ -163,7 +169,7 @@ describe('hot-seat board', () => {
       await user.click(choice!);
     }
 
-    expect(screen.getByText(/^Durak je |^Remíza/)).toBeTruthy();
+    expect(resultBanner()).toMatch(/^Durak je |^Remíza|^Patová/);
     // Exactly one seat may still hold cards — the fool. A draw leaves none.
     const withCards = Array.from(document.querySelectorAll('.seat')).filter(
       (el) => el.querySelectorAll('.hand .card img').length > 0,
@@ -220,10 +226,79 @@ describe('playing against a bot', () => {
     await waitFor(
       () => {
         // Either the bot covered our attack or it led one of its own.
-        const moved = tableCards().length > 1 || screen.queryByText(/^Durak je |^Remíza/) !== null;
+        const moved = tableCards().length > 1 || resultBanner() !== null;
         expect(moved || document.querySelectorAll('.log li').length > 1).toBe(true);
       },
       { timeout: 6000 },
     );
   }, 20_000);
+});
+
+describe('rules panel', () => {
+  it('applies a preset and says which one is active', async () => {
+    const user = userEvent.setup();
+    render(<App />);
+
+    const panel = screen.getByText('Pravidlá').closest('details')!;
+    // The name shows up twice by design: as a preset button and as the summary.
+    expect(within(panel).getByRole('button', { name: 'Klasický durak' })).toBeTruthy();
+    expect(panel.querySelector('.rules__current')?.textContent).toBe('Klasický durak');
+
+    await user.click(within(panel).getByRole('button', { name: 'S prehadzovaním' }));
+    expect(panel.querySelector('.rules__current')?.textContent).toBe('S prehadzovaním');
+    expect(within(panel).getByLabelText<HTMLInputElement>(/Prehadzovanie \(perevodnoy\)/).checked).toBe(true);
+  });
+
+  it('greys out sub-options of a rule that is switched off', () => {
+    render(<App />);
+    const panel = screen.getByText('Pravidlá').closest('details')!;
+    expect(within(panel).getByLabelText(/Reťazenie prehodení/).hasAttribute('disabled')).toBe(true);
+  });
+
+  it('warns about a switch that changes the game more than it looks', async () => {
+    const user = userEvent.setup();
+    render(<App />);
+
+    const panel = screen.getByText('Pravidlá').closest('details')!;
+    await user.click(within(panel).getByLabelText(/Obranca musí zbiť/));
+    expect(screen.getByText(/berie obrancovi voľbu/)).toBeTruthy();
+    // A warning must never block starting a game — only errors do that.
+    expect(screen.getByRole('button', { name: 'Nová hra' }).hasAttribute('disabled')).toBe(false);
+  });
+
+  it('turns the transfer rule into a playable move', async () => {
+    const user = userEvent.setup();
+    render(<App />);
+
+    const panel = screen.getByText('Pravidlá').closest('details')!;
+    await user.click(within(panel).getByRole('button', { name: 'S prehadzovaním' }));
+    await user.selectOptions(screen.getByLabelText('Miesto 2'), 'human');
+
+    // Search seeds until one offers a transfer within the first few moves; the
+    // point is that the affordance exists and is clickable, not which deal.
+    const seedBox = screen.getByTitle(/Rovnaký seed/);
+    let found = false;
+    for (let seed = 0; seed < 25 && !found; seed++) {
+      await user.clear(seedBox);
+      await user.type(seedBox, `t${seed}`);
+      await user.click(screen.getByRole('button', { name: 'Nová hra' }));
+
+      for (let step = 0; step < 6 && !found; step++) {
+        const transferBtn = screen.queryByRole('button', { name: /^Prehodiť / });
+        if (transferBtn) {
+          await user.click(transferBtn);
+          found = true;
+          break;
+        }
+        const cards = Array.from(
+          document.querySelectorAll('.seat--active .hand button.card'),
+        ).filter((el) => !el.classList.contains('card--muted')) as HTMLElement[];
+        const switches = screen.queryAllByRole('button', { name: /^Prepnúť na / });
+        const next = cards[0] ?? switches[0];
+        if (!next) break;
+        await user.click(next);
+      }
+    }
+    expect(found, 'no deal in 25 seeds ever offered a transfer').toBe(true);
+  }, 60_000);
 });

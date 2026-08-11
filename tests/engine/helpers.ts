@@ -43,6 +43,7 @@ export interface StateSpec {
   defenderTaking?: boolean;
   defenderHandAtBoutStart?: number;
   passed?: boolean[];
+  transfersThisBout?: number;
   boutIndex?: number;
   config?: Partial<RuleConfig>;
 }
@@ -109,6 +110,8 @@ export function makeState(spec: StateSpec): GameState {
     defenderTaking: spec.defenderTaking ?? false,
     defenderHandAtBoutStart: spec.defenderHandAtBoutStart ?? hands[defender]!.length,
     passed: spec.passed ?? hands.map(() => false),
+    transfersThisBout: spec.transfersThisBout ?? 0,
+    boutsWithoutProgress: 0,
     result: null,
   };
 }

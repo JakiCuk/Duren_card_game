@@ -27,12 +27,67 @@ import {
   type Seat,
 } from '../src/engine/index.js';
 import { nextInt, seedRng, type RngState } from '../src/engine/rng.js';
-import { DEFAULT_RULES, type RuleConfig } from '../src/shared/rules.js';
+import {
+  DEFAULT_RULES,
+  isPlayable,
+  MAX_PLAYERS,
+  MIN_PLAYERS,
+  type AttackCap,
+  type AttackerScope,
+  type RuleConfig,
+  type ThrowInAfterTakeCap,
+} from '../src/shared/rules.js';
 
 /** Guards against livelocks: no legal Durak game comes anywhere near this. */
 export const MAX_STEPS = 2000;
 
 export type Chooser = (view: PlayerView, seat: Seat) => Move;
+
+const CAPS: AttackCap[] = [
+  { kind: 'defenderHand' },
+  { kind: 'unlimited' },
+  { kind: 'fixed', n: 3 },
+  { kind: 'fixed', n: 6 },
+];
+const AFTER_TAKE: ThrowInAfterTakeCap[] = ['sameAsAttack', 'defenderHandAtBoutStart', 'unlimited'];
+const SCOPES: AttackerScope[] = ['all', 'neighbours'];
+
+/**
+ * A random *playable* rule configuration and table size.
+ *
+ * Sampling the whole switch matrix is the only practical way to be sure the
+ * combinations nobody thought about still terminate and still conserve cards —
+ * which is exactly what the perevodnoy and cap options put at risk.
+ */
+export function randomSetup(
+  rng: RngState,
+  fixedPlayers?: number,
+): { config: RuleConfig; players: number } {
+  for (let attempt = 0; attempt < 200; attempt++) {
+    const players = fixedPlayers ?? MIN_PLAYERS + nextInt(rng, MAX_PLAYERS - MIN_PLAYERS + 1);
+    const transferOn = nextInt(rng, 2) === 0;
+    const config: RuleConfig = {
+      deckSize: nextInt(rng, 2) === 0 ? 36 : 52,
+      handSize: 4 + nextInt(rng, 3),
+      maxTableSlots: 4 + nextInt(rng, 5),
+      attackCap: CAPS[nextInt(rng, CAPS.length)]!,
+      throwInAfterTakeCap: AFTER_TAKE[nextInt(rng, AFTER_TAKE.length)]!,
+      firstBoutCapFive: nextInt(rng, 2) === 0,
+      throwInAfterTake: nextInt(rng, 4) > 0,
+      attackerScope: SCOPES[nextInt(rng, SCOPES.length)]!,
+      transfer: {
+        enabled: transferOn,
+        withTrumpReveal: transferOn && nextInt(rng, 2) === 0,
+        allowChains: transferOn && nextInt(rng, 2) === 0,
+      },
+      firstAttacker: nextInt(rng, 2) === 0 ? 'lowestTrump' : 'random',
+      defenderMustBeatAll: nextInt(rng, 3) === 0,
+      trumpCardVisible: nextInt(rng, 4) > 0,
+    };
+    if (isPlayable(config, players)) return { config, players };
+  }
+  return { config: DEFAULT_RULES, players: fixedPlayers ?? 2 };
+}
 
 export interface PlayOptions {
   seed: number | string;
@@ -161,10 +216,11 @@ interface Args {
   seed: number;
   check: boolean;
   levels: BotLevel[] | null;
+  matrix: boolean;
 }
 
 function parseArgs(argv: readonly string[]): Args {
-  const args: Args = { games: 1000, players: 2, deck: 36, seed: 1, check: true, levels: null };
+  const args: Args = { games: 1000, players: 2, deck: 36, seed: 1, check: true, levels: null, matrix: false };
   // `pnpm sim -- --games 10` forwards the bare `--` too; drop it.
   const clean = argv.filter((a) => a !== '--');
   for (let i = 0; i < clean.length; i += 2) {
@@ -177,6 +233,7 @@ function parseArgs(argv: readonly string[]): Args {
       case '--deck': args.deck = Number(value) === 52 ? 52 : 36; break;
       case '--seed': args.seed = Number(value); break;
       case '--check': args.check = value !== 'false'; break;
+      case '--matrix': args.matrix = value !== 'false'; break;
       case '--bots': {
         const levels = value.split(',').map(Number);
         if (!levels.every(isBotLevel)) throw new Error(`--bots takes levels 1..4, got ${value}`);
@@ -200,10 +257,15 @@ function main(argv: readonly string[]): void {
 
   for (let i = 0; i < args.games; i++) {
     const seed = args.seed + i;
+    // With bots the table size is fixed by how many were asked for, so keep
+    // resampling until the rules can actually deal that many hands.
+    const setup = args.matrix
+      ? randomSetup(seedRng(`matrix:${seed}`), args.levels?.length)
+      : { config, players: args.players };
     try {
       const outcome = args.levels
-        ? playBotGame({ seed, levels: args.levels, config, check: args.check })
-        : playGame({ seed, players: args.players, config, check: args.check });
+        ? playBotGame({ seed, levels: args.levels, config: setup.config, check: args.check })
+        : playGame({ seed, players: setup.players, config: setup.config, check: args.check });
       totalSteps += outcome.steps;
       const durak = outcome.state.result?.durak;
       if (durak === null || durak === undefined) draws++;
@@ -213,14 +275,18 @@ function main(argv: readonly string[]): void {
       }
     } catch (err) {
       console.error(`\nFAILED on seed ${seed}`);
-      console.error(JSON.stringify({ seed, players: args.players, bots: args.levels, config }, null, 2));
+      console.error(JSON.stringify({ seed, players: setup.players, bots: args.levels, config: setup.config }, null, 2));
       console.error(err);
       process.exit(1);
     }
   }
 
   const ms = Date.now() - started;
-  const who = args.levels ? `bots ${args.levels.join(' vs ')}` : `${args.players}p random`;
+  const who = args.matrix
+    ? 'random rule matrix'
+    : args.levels
+      ? `bots ${args.levels.join(' vs ')}`
+      : `${args.players}p random`;
   console.log(
     `${args.games} games, ${who}, ${args.deck}-card deck: OK in ${ms} ms ` +
       `(${(args.games / (ms / 1000)).toFixed(0)} games/s, ${(totalSteps / args.games).toFixed(1)} moves/game)`,

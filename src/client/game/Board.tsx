@@ -56,6 +56,10 @@ export function Board({ state, actors, humanActors, isBot, movesFor, play, seatN
 
   const takeMove = moves.find((m) => m.t === 'TAKE');
   const passMove = moves.find((m) => m.t === 'PASS');
+  // Transfers get their own buttons rather than lighting up a card: the same
+  // card can often be both a legal defence and a legal transfer, and a click on
+  // it would be ambiguous.
+  const transfers = moves.filter((m) => m.t === 'TRANSFER');
 
   return (
     <div className="board">
@@ -182,6 +186,22 @@ export function Board({ state, actors, humanActors, isBot, movesFor, play, seatN
             Beriem
           </button>
         ) : null}
+        {transfers.map((m) => (
+          <button
+            key={`${m.card}-${String(m.reveal)}`}
+            type="button"
+            className="btn"
+            onClick={() => play(m)}
+            title={
+              m.reveal
+                ? 'Ukáž tromf rovnakej hodnoty — karta ti zostane v ruke'
+                : 'Prehoď útok na ďalšieho hráča'
+            }
+          >
+            Prehodiť {cardCode(m.card)}
+            {m.reveal ? ' (ukázať)' : ''}
+          </button>
+        ))}
         {passMove ? (
           <button type="button" className="btn" onClick={() => play(passMove)}>
             Bito / koniec prihadzovania

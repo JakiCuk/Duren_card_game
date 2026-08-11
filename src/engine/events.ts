@@ -11,6 +11,8 @@ export type GameEvent =
   | { k: 'dealt'; hands: CardId[][]; trumpCard: CardId }
   | { k: 'attack'; seat: Seat; card: CardId; throwIn: boolean }
   | { k: 'defend'; seat: Seat; card: CardId; slot: number }
+  /** Perevodnoy: `seat` handed the defence to `to`. A revealed card stays in hand. */
+  | { k: 'transfer'; seat: Seat; to: Seat; card: CardId; revealed: boolean }
   /** The defender declared "I take". The cards do not move until the bout resolves. */
   | { k: 'takeDeclared'; seat: Seat }
   | { k: 'take'; seat: Seat; cards: CardId[] }

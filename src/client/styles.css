@@ -457,3 +457,57 @@ body {
   font-size: 0.82rem;
   color: var(--muted);
 }
+
+/* --- rules panel ----------------------------------------------------------- */
+
+.rules {
+  margin-top: 0.75rem;
+  border-top: 1px solid var(--line);
+  padding-top: 0.6rem;
+}
+
+.rules > summary {
+  cursor: pointer;
+  font-size: 0.85rem;
+  color: var(--muted);
+  display: flex;
+  gap: 0.5rem;
+  align-items: baseline;
+}
+
+.rules__current {
+  color: var(--accent);
+  font-weight: 600;
+}
+
+.rules__body {
+  display: grid;
+  gap: 0.75rem;
+  padding-top: 0.75rem;
+}
+
+.rules__toggles {
+  display: grid;
+  gap: 0.35rem;
+  grid-template-columns: repeat(auto-fit, minmax(17rem, 1fr));
+}
+
+.toggle {
+  display: flex !important;
+  gap: 0.45rem;
+  align-items: center;
+  font-size: 0.85rem;
+  color: var(--ink);
+  cursor: pointer;
+}
+
+.toggle--off {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+.btn--on {
+  border-style: solid;
+  border-color: var(--accent);
+  color: var(--ink);
+}

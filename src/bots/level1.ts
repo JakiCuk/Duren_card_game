@@ -6,6 +6,7 @@ import {
   passMove,
   pickCheapest,
   takeMove,
+  transferMoves,
   unbeatenSlots,
 } from './heuristics.js';
 import { NoLegalMoveError, type BotPolicy } from './types.js';
@@ -28,6 +29,12 @@ export function createLevel1(seat: Seat, _seed: number | string): BotPolicy {
       if (view.legalMoves.length === 0) throw new NoLegalMoveError(seat);
       const trump = view.trump;
       const plainFirst = (c: CardId): number => (isTrump(c, trump) ? 100 : 0) + rankOf(c);
+
+      // Passing the whole attack on costs one plain card and solves the bout,
+      // so it beats defending it — but never at the price of a trump.
+      const plainTransfers = transferMoves(view).filter((m) => !isTrump(m.card, trump));
+      const handOff = pickCheapest(plainTransfers, plainFirst);
+      if (handOff) return handOff;
 
       // Defending: cover the oldest open slot with the cheapest card that does
       // the job; if nothing does, take.

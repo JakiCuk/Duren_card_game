@@ -35,11 +35,30 @@ export interface TableSlot {
 export type Phase = 'bout' | 'finished';
 
 export interface GameResult {
-  /** The loser. `null` means everybody went out on the same bout — a draw. */
+  /** The loser. `null` means a draw. */
   durak: PlayerId | null;
   /** Finish order, first one out first. Excludes the durak. */
   order: PlayerId[];
+  /**
+   * `played_out` — somebody was left holding cards, or everyone emptied at once.
+   * `stalemate` — the position was circulating with no progress; see
+   * `MAX_BOUTS_WITHOUT_PROGRESS`.
+   */
+  reason: 'played_out' | 'stalemate';
 }
+
+/**
+ * Bouts allowed to pass without a single card reaching the discard and without
+ * the deck shrinking.
+ *
+ * Durak can genuinely cycle: three players who each cannot beat the next one
+ * pass a card round the table forever, and identical positions recur. Humans
+ * break it by playing differently; deterministic bots do not, and a server room
+ * would hang. Termination therefore has to be a rule, not a hope — any real
+ * game reaches a discard within a couple of bouts, so this only ever fires on a
+ * position that was never going to resolve.
+ */
+export const MAX_BOUTS_WITHOUT_PROGRESS = 32;
 
 export interface GameState {
   readonly config: RuleConfig;
@@ -68,6 +87,10 @@ export interface GameState {
   defenderHandAtBoutStart: number;
   /** Per seat. Cleared on every table mutation: a new rank can re-enable someone. */
   passed: boolean[];
+  /** Transfers already made this bout, so `allowChains: false` is enforceable. */
+  transfersThisBout: number;
+  /** Consecutive bouts in which neither the discard grew nor the deck shrank. */
+  boutsWithoutProgress: number;
 
   result: GameResult | null;
 }
@@ -150,6 +173,8 @@ export function createGame(opts: NewGameOptions): CreateGameResult {
     defenderTaking: false,
     defenderHandAtBoutStart: 0,
     passed: players.map(() => false),
+    transfersThisBout: 0,
+    boutsWithoutProgress: 0,
     result: null,
   };
 
@@ -216,7 +241,11 @@ export function cloneState(s: GameState): GameState {
     defenderTaking: s.defenderTaking,
     defenderHandAtBoutStart: s.defenderHandAtBoutStart,
     passed: s.passed.slice(),
-    result: s.result ? { durak: s.result.durak, order: s.result.order.slice() } : null,
+    transfersThisBout: s.transfersThisBout,
+    boutsWithoutProgress: s.boutsWithoutProgress,
+    result: s.result
+      ? { durak: s.result.durak, order: s.result.order.slice(), reason: s.result.reason }
+      : null,
   };
 }
 

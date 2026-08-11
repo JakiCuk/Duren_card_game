@@ -19,6 +19,12 @@ import type { Seat } from './state.js';
 export type Move =
   | { t: 'ATTACK'; seat: Seat; card: CardId }
   | { t: 'DEFEND'; seat: Seat; card: CardId; slot: number }
+  /**
+   * Perevodnoy: pass the attack to the next player with a card of the same
+   * rank. With `reveal` the card is only *shown* — it stays in hand and the
+   * table does not grow, which is why the two need separate cap arithmetic.
+   */
+  | { t: 'TRANSFER'; seat: Seat; card: CardId; reveal: boolean }
   | { t: 'TAKE'; seat: Seat }
   | { t: 'PASS'; seat: Seat };
 
@@ -31,6 +37,8 @@ export function moveKey(m: Move): string {
       return `A${m.seat}:${m.card}`;
     case 'DEFEND':
       return `D${m.seat}:${m.card}@${m.slot}`;
+    case 'TRANSFER':
+      return `X${m.seat}:${m.card}${m.reveal ? 'r' : ''}`;
     case 'TAKE':
       return `T${m.seat}`;
     case 'PASS':

@@ -1,13 +1,21 @@
 import type { CardId } from './cards.js';
 import { compareCards } from './cards.js';
 import type { GameEvent } from './events.js';
-import { boutIsResolvable, ctxOf, eligibleAttackers, hasLegalAttack, isLegal } from './legality.js';
+import {
+  boutIsResolvable,
+  ctxOf,
+  eligibleAttackers,
+  hasLegalAttack,
+  isLegal,
+  transferTarget,
+} from './legality.js';
 import type { Move } from './moves.js';
 import { moveKey } from './moves.js';
 import type { GameResult, GameState, PlayerState, Seat } from './state.js';
 import {
   activeSeats,
   cloneState,
+  MAX_BOUTS_WITHOUT_PROGRESS,
   nextActiveFrom,
   playerAt,
   seatCount,
@@ -57,6 +65,24 @@ export function applyMove(state: GameState, move: Move): ApplyResult {
       takeFromHand(playerAt(s, move.seat), move.card);
       s.table[move.slot]!.defence = move.card;
       events.push({ k: 'defend', seat: move.seat, card: move.card, slot: move.slot });
+      clearPassed(s);
+      break;
+    }
+    case 'TRANSFER': {
+      const from = move.seat;
+      const to = transferTarget(ctxOf(s));
+      if (!move.reveal) {
+        takeFromHand(playerAt(s, from), move.card);
+        s.table.push({ attack: move.card, defence: null });
+      }
+      events.push({ k: 'transfer', seat: from, to, card: move.card, revealed: move.reveal });
+
+      s.defender = to;
+      // Two-handed perevodnoy bounces the attack straight back at the attacker,
+      // so the player who just passed it on becomes the attacking side.
+      if (s.attacker === to) s.attacker = from;
+      s.transfersThisBout += 1;
+      s.defenderHandAtBoutStart = playerAt(s, to).hand.length;
       clearPassed(s);
       break;
     }
@@ -114,6 +140,7 @@ function resolveIfDone(s: GameState, events: GameEvent[]): void {
   const defenderSeat = s.defender;
   const wasTaken = s.defenderTaking;
   const cards = tableCards(s);
+  const deckBefore = s.deck.length;
 
   if (wasTaken) {
     const defender = playerAt(s, defenderSeat);
@@ -139,9 +166,18 @@ function resolveIfDone(s: GameState, events: GameEvent[]): void {
     }
   }
 
+  // "Progress" means cards left play or the deck shrank. A run of pure takes
+  // moves cards between hands without either, which is exactly the shape of a
+  // cycle.
+  s.boutsWithoutProgress = !wasTaken || s.deck.length < deckBefore ? 0 : s.boutsWithoutProgress + 1;
+
   const active = activeSeats(s);
   if (active.length <= 1) {
-    finish(s, events, active);
+    finish(s, events, active, 'played_out');
+    return;
+  }
+  if (s.boutsWithoutProgress >= MAX_BOUTS_WITHOUT_PROGRESS) {
+    finish(s, events, [], 'stalemate');
     return;
   }
 
@@ -154,6 +190,7 @@ function resolveIfDone(s: GameState, events: GameEvent[]): void {
   s.defenderHandAtBoutStart = playerAt(s, s.defender).hand.length;
   s.boutIndex += 1;
   s.passed.fill(false);
+  s.transfersThisBout = 0;
 }
 
 function refill(s: GameState, events: GameEvent[]): void {
@@ -188,7 +225,12 @@ function refill(s: GameState, events: GameEvent[]): void {
   }
 }
 
-function finish(s: GameState, events: GameEvent[], active: Seat[]): void {
+function finish(
+  s: GameState,
+  events: GameEvent[],
+  active: Seat[],
+  reason: GameResult['reason'],
+): void {
   const order = s.players
     .filter((p) => p.outAtStep !== null)
     .sort((a, b) => a.outAtStep! - b.outAtStep! || a.seat - b.seat)
@@ -198,11 +240,15 @@ function finish(s: GameState, events: GameEvent[], active: Seat[]): void {
   const result: GameResult = {
     durak: durakSeat === undefined ? null : playerAt(s, durakSeat).id,
     order,
+    reason,
   };
 
   s.result = result;
   s.phase = 'finished';
-  events.push({ k: 'gameOver', result: { durak: result.durak, order: result.order.slice() } });
+  events.push({
+    k: 'gameOver',
+    result: { durak: result.durak, order: result.order.slice(), reason },
+  });
 }
 
 /** Convenience for tests and replays: fold a move list over a starting state. */

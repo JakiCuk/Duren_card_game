@@ -3,6 +3,7 @@ import { BOT_CATALOGUE, type BotLevel } from '../bots/index.js';
 import { validateConfig, type RuleConfig } from '../shared/rules.js';
 import { CLIENT_VERSION } from '../shared/version.js';
 import { Board } from './game/Board.js';
+import { RulesPanel } from './game/RulesPanel.js';
 import { describeEvent } from './game/log.js';
 import { defaultSetup, useLocalGame, type LocalGameSetup } from './game/useLocalGame.js';
 
@@ -121,6 +122,8 @@ export function App() {
         </div>
         <p className="hint">{describeBots(draft.bots.slice(0, draft.players))}</p>
 
+        <RulesPanel config={draft.config} onChange={(config) => setDraft({ ...draft, config })} />
+
         {verdict.errors.length > 0 ? (
           <p className="problem problem--error">{verdict.errors.map(explain).join(' ')}</p>
         ) : null}
@@ -131,9 +134,11 @@ export function App() {
 
       {result ? (
         <section className={`banner${result.durak === null ? '' : ' banner--loss'}`}>
-          {result.durak === null
-            ? 'Remíza — všetci sa zbavili kariet naraz.'
-            : `Durak je ${seatName(Number(result.durak.slice(1)))}.`}
+          {result.reason === 'stalemate'
+            ? 'Patová pozícia — karty len kolovali dokola, nikto nie je durak.'
+            : result.durak === null
+              ? 'Remíza — všetci sa zbavili kariet naraz.'
+              : `Durak je ${seatName(Number(result.durak.slice(1)))}.`}
         </section>
       ) : null}
 
@@ -195,6 +200,18 @@ function explain(problem: { code: string; params?: Record<string, number | strin
       return 'Nepodporovaný limit kariet na stole.';
     case 'first_bout_cap_meaningless':
       return 'Obmedzenie prvého kola nedáva pri takto malej ruke zmysel.';
+    case 'attack_cap_out_of_range':
+      return 'Nepodporovaný limit útoku.';
+    case 'scope_has_no_effect':
+      return 'Pri tomto počte hráčov je obrancov sused každý — voľba nič nemení.';
+    case 'transfer_options_without_transfer':
+      return 'Podvoľby prehadzovania nič nerobia, kým je samotné prehadzovanie vypnuté.';
+    case 'transfer_two_players':
+      return 'Vo dvojici sa útok prehodením vracia späť na útočníka — hra je tým divokejšia.';
+    case 'must_beat_all_changes_the_game':
+      return 'Pravidlo „musí zbiť" berie obrancovi voľbu a výrazne pomáha počítajúcim botom.';
+    case 'must_beat_all_with_unlimited_pile':
+      return 'S neobmedzeným prihadzovaním po „beriem" môžu útočníci obrancu mlieť celú ruku.';
     default:
       return problem.code;
   }

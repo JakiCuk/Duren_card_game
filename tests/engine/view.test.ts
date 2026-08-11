@@ -107,6 +107,7 @@ describe('redaction', () => {
         'seq',
         'table',
         'trump',
+        'transfersThisBout',
         'trumpCard',
         'you',
       ].sort(),
