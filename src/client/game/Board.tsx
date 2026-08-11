@@ -16,13 +16,16 @@ const SUIT_NAME = ['Kríže', 'Kára', 'Srdcia', 'Piky'] as const;
 export interface BoardProps {
   state: GameState;
   actors: Seat[];
+  /** Seats a human may act for; bot seats are never selectable. */
+  humanActors: Seat[];
+  isBot: (seat: Seat) => boolean;
   movesFor: (seat: Seat) => Move[];
   play: (move: Move) => void;
   seatName: (seat: Seat) => string;
 }
 
-export function Board({ state, actors, movesFor, play, seatName }: BoardProps) {
-  const [seat, setSeat] = useState<Seat>(actors[0] ?? 0);
+export function Board({ state, actors, humanActors, isBot, movesFor, play, seatName }: BoardProps) {
+  const [seat, setSeat] = useState<Seat>(humanActors[0] ?? 0);
   const [slot, setSlot] = useState(0);
 
   const firstUnbeaten = state.table.findIndex((t) => t.defence === null);
@@ -30,13 +33,16 @@ export function Board({ state, actors, movesFor, play, seatName }: BoardProps) {
   // Keep the active seat on somebody who can actually move, and keep the
   // defence target on a slot that still needs covering.
   useEffect(() => {
-    if (actors.length > 0 && !actors.includes(seat)) setSeat(actors[0]!);
-  }, [actors, seat]);
+    if (humanActors.length > 0 && !humanActors.includes(seat)) setSeat(humanActors[0]!);
+  }, [humanActors, seat]);
   useEffect(() => {
     if (state.table[slot]?.defence !== null) setSlot(firstUnbeaten === -1 ? 0 : firstUnbeaten);
   }, [state.table, slot, firstUnbeaten]);
 
-  const moves = useMemo(() => (actors.includes(seat) ? movesFor(seat) : []), [actors, seat, movesFor]);
+  const moves = useMemo(
+    () => (humanActors.includes(seat) ? movesFor(seat) : []),
+    [humanActors, seat, movesFor],
+  );
   const isDefender = seat === state.defender;
 
   const playableCards = useMemo(() => {
@@ -109,7 +115,9 @@ export function Board({ state, actors, movesFor, play, seatName }: BoardProps) {
       <div className="seats">
         {state.players.map((p) => {
           const canAct = actors.includes(p.seat);
+          const bot = isBot(p.seat);
           const roles: string[] = [];
+          if (bot) roles.push('bot');
           if (p.seat === state.attacker) roles.push('útočí');
           if (p.seat === state.defender) roles.push(state.defenderTaking ? 'berie' : 'bráni');
           if (p.outAtStep !== null) roles.push('vypadol z hry');
@@ -126,8 +134,14 @@ export function Board({ state, actors, movesFor, play, seatName }: BoardProps) {
                   type="button"
                   className="seat__name"
                   onClick={() => setSeat(p.seat)}
-                  disabled={!canAct}
-                  title={canAct ? 'Prepnúť na tohto hráča' : 'Tento hráč teraz nie je na ťahu'}
+                  disabled={!canAct || bot}
+                  title={
+                    bot
+                      ? 'Toto miesto hrá bot'
+                      : canAct
+                        ? 'Prepnúť na tohto hráča'
+                        : 'Tento hráč teraz nie je na ťahu'
+                  }
                 >
                   {seatName(p.seat)}
                 </button>
@@ -136,18 +150,25 @@ export function Board({ state, actors, movesFor, play, seatName }: BoardProps) {
               </header>
 
               <div className="hand">
-                {sortForDisplay(p.hand, state.trump).map((card) => {
-                  const move = p.seat === seat ? playableCards.get(card) : undefined;
-                  return (
-                    <CardFace
-                      key={card}
-                      card={card}
-                      size="md"
-                      muted={p.seat === seat && move === undefined && canAct}
-                      {...(move ? { onClick: () => play(move) } : {})}
-                    />
-                  );
-                })}
+                {bot
+                  ? // A bot's cards must never reach the DOM, not even as an alt
+                    // attribute — otherwise "play against the computer" is a lie
+                    // anyone can check with dev tools.
+                    Array.from({ length: p.hand.length }, (_, i) => (
+                      <CardFace key={i} card={0} faceDown size="md" />
+                    ))
+                  : sortForDisplay(p.hand, state.trump).map((card) => {
+                      const move = p.seat === seat ? playableCards.get(card) : undefined;
+                      return (
+                        <CardFace
+                          key={card}
+                          card={card}
+                          size="md"
+                          muted={p.seat === seat && move === undefined && canAct}
+                          {...(move ? { onClick: () => play(move) } : {})}
+                        />
+                      );
+                    })}
                 {p.hand.length === 0 ? <span className="hand__empty">bez kariet</span> : null}
               </div>
             </section>
@@ -166,15 +187,18 @@ export function Board({ state, actors, movesFor, play, seatName }: BoardProps) {
             Bito / koniec prihadzovania
           </button>
         ) : null}
-        {actors
+        {humanActors
           .filter((s) => s !== seat)
           .map((s) => (
             <button key={s} type="button" className="btn btn--ghost" onClick={() => setSeat(s)}>
               Prepnúť na {seatName(s)}
             </button>
           ))}
-        {actors.length > 1 ? (
+        {humanActors.length > 1 ? (
           <span className="actions__note">Konať môže viacero hráčov naraz.</span>
+        ) : null}
+        {humanActors.length === 0 && state.phase === 'bout' ? (
+          <span className="actions__note">Na ťahu je bot…</span>
         ) : null}
       </div>
     </div>

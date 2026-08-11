@@ -4,6 +4,7 @@ export * from './state.js';
 export * from './moves.js';
 export * from './events.js';
 export * from './legality.js';
+export * from './view.js';
 export * from './apply.js';
 export * from './hash.js';
 export * from './invariants.js';

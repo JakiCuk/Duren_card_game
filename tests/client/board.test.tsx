@@ -1,5 +1,5 @@
 // @vitest-environment jsdom
-import { cleanup, render, screen, within } from '@testing-library/react';
+import { cleanup, render, screen, waitFor, within } from '@testing-library/react';
 // Named import, not default: under NodeNext resolution the default export of
 // this package does not carry its type.
 import { userEvent } from '@testing-library/user-event';
@@ -9,6 +9,18 @@ import { App } from '../../src/client/App.js';
 afterEach(cleanup);
 
 const seatPanels = () => screen.getAllByRole('region');
+
+type User = ReturnType<typeof userEvent.setup>;
+
+/**
+ * The product default is human vs bot. These tests want two humans at one
+ * device, so they hand seat 2 back to a person and redeal.
+ */
+async function renderHotSeat(user: User): Promise<void> {
+  render(<App />);
+  await user.selectOptions(screen.getByLabelText('Miesto 2'), 'human');
+  await user.click(screen.getByRole('button', { name: 'Nová hra' }));
+}
 
 /**
  * The seat currently marked as attacking. Read from the seat badge rather than
@@ -45,8 +57,8 @@ const playableCards = (name: string): HTMLElement[] =>
   ) as HTMLElement[];
 
 describe('hot-seat board', () => {
-  it('deals a visible game to every seat', () => {
-    render(<App />);
+  it('deals a visible game to every seat', async () => {
+    await renderHotSeat(userEvent.setup());
     expect(screen.getByRole('heading', { name: 'Durak' })).toBeTruthy();
     expect(handCards('Hráč 1')).toHaveLength(6);
     expect(handCards('Hráč 2')).toHaveLength(6);
@@ -56,7 +68,7 @@ describe('hot-seat board', () => {
 
   it('plays a card from the attacking hand onto the table', async () => {
     const user = userEvent.setup();
-    render(<App />);
+    await renderHotSeat(user);
 
     const attacker = attackerName();
     const before = handCards(attacker).length;
@@ -71,7 +83,7 @@ describe('hot-seat board', () => {
 
   it('offers the defender a way to take the cards, and takes them', async () => {
     const user = userEvent.setup();
-    render(<App />);
+    await renderHotSeat(user);
 
     const attacker = attackerName();
     await user.click(playableCards(attacker)[0]!);
@@ -103,7 +115,7 @@ describe('hot-seat board', () => {
 
   it('undoes the last move', async () => {
     const user = userEvent.setup();
-    render(<App />);
+    await renderHotSeat(user);
 
     const attacker = attackerName();
     await user.click(playableCards(attacker)[0]!);
@@ -116,7 +128,7 @@ describe('hot-seat board', () => {
 
   it('deals the same cards again for the same seed', async () => {
     const user = userEvent.setup();
-    render(<App />);
+    await renderHotSeat(user);
 
     const seed = screen.getByTitle(/Rovnaký seed/);
     await user.clear(seed);
@@ -130,7 +142,7 @@ describe('hot-seat board', () => {
 
   it('can be played from the deal to a durak using only the UI', async () => {
     const user = userEvent.setup();
-    render(<App />);
+    await renderHotSeat(user);
 
     // Clicks whatever the board currently offers until somebody is the fool.
     // If the UI ever fails to offer a move the game would stall here, which is
@@ -172,4 +184,46 @@ describe('hot-seat board', () => {
     await user.click(screen.getByRole('button', { name: 'Nová hra' }));
     expect(seatPanels().length).toBeGreaterThanOrEqual(6);
   });
+});
+
+describe('playing against a bot', () => {
+  const seatPanel = (name: string): HTMLElement => screen.getByRole('region', { name });
+
+  it('marks the bot seat and keeps its cards face down', () => {
+    render(<App />);
+    const bot = seatPanel('Hráč 2');
+    expect(bot.textContent).toContain('bot');
+
+    const images = within(bot).getAllByRole('img');
+    expect(images).toHaveLength(6);
+    // Every one is the back. If a card code ever appears here, "play against
+    // the computer" would be a lie anyone could check in dev tools.
+    expect(images.every((img) => img.getAttribute('alt') === 'Rubová strana')).toBe(true);
+    expect(bot.innerHTML).not.toMatch(/alt="[2-9TJQKA][CDHS]"/);
+  });
+
+  it('does not let a human act for the bot', () => {
+    render(<App />);
+    expect(within(seatPanel('Hráč 2')).queryByRole('button', { name: /^Prepnúť/ })).toBeNull();
+    expect(screen.getByRole('button', { name: 'Hráč 2' }).hasAttribute('disabled')).toBe(true);
+    expect(within(seatPanel('Hráč 2')).queryAllByRole('button', { name: /^[2-9TJQKA][CDHS]$/ })).toHaveLength(0);
+  });
+
+  it('answers on its own without any further clicks', async () => {
+    const user = userEvent.setup();
+    render(<App />);
+
+    // If the human opens, play one card; otherwise the bot opens by itself.
+    const mine = playableCards('Hráč 1');
+    if (mine.length > 0) await user.click(mine[0]!);
+
+    await waitFor(
+      () => {
+        // Either the bot covered our attack or it led one of its own.
+        const moved = tableCards().length > 1 || screen.queryByText(/^Durak je |^Remíza/) !== null;
+        expect(moved || document.querySelectorAll('.log li').length > 1).toBe(true);
+      },
+      { timeout: 6000 },
+    );
+  }, 20_000);
 });

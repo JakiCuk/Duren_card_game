@@ -25,6 +25,7 @@
     "test": "vitest run",
     "test:watch": "vitest",
     "sim": "tsx tools/sim.ts",
+    "duel": "tsx tools/duel.ts",
     "bench": "tsx tools/bench.ts"
   },
   "dependencies": {

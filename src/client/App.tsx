@@ -1,4 +1,5 @@
 import { useMemo, useState } from 'react';
+import { BOT_CATALOGUE, type BotLevel } from '../bots/index.js';
 import { validateConfig, type RuleConfig } from '../shared/rules.js';
 import { CLIENT_VERSION } from '../shared/version.js';
 import { Board } from './game/Board.js';
@@ -27,7 +28,10 @@ export function App() {
     <main className="shell">
       <header className="masthead">
         <h1>Durak</h1>
-        <p className="lede">Hra na jednom zariadení. Boti a online hra pribudnú v ďalších krokoch.</p>
+        <p className="lede">
+          Hra proti botom alebo proti sebe na jednom zariadení. Online hra so živými hráčmi
+          pribudne v ďalšom kroku.
+        </p>
       </header>
 
       <section className="panel">
@@ -36,7 +40,11 @@ export function App() {
             Hráčov
             <select
               value={draft.players}
-              onChange={(e) => setDraft({ ...draft, players: Number(e.target.value) })}
+              onChange={(e) => {
+                const players = Number(e.target.value);
+                const bots = Array.from({ length: players }, (_, i) => draft.bots[i] ?? (i === 0 ? null : 2));
+                setDraft({ ...draft, players, bots });
+              }}
             >
               {[2, 3, 4, 5, 6].map((n) => (
                 <option key={n} value={n}>
@@ -85,6 +93,34 @@ export function App() {
           </button>
         </div>
 
+        <div className="panel__row panel__row--seats">
+          {Array.from({ length: draft.players }, (_, seat) => (
+            <label key={seat}>
+              {`Miesto ${seat + 1}`}
+              <select
+                value={draft.bots[seat] ?? 'human'}
+                onChange={(e) =>
+                  setDraft({
+                    ...draft,
+                    bots: draft.bots.map((b, i) =>
+                      i === seat ? (e.target.value === 'human' ? null : (Number(e.target.value) as BotLevel)) : b,
+                    ),
+                  })
+                }
+              >
+                <option value="human">Človek</option>
+                {BOT_CATALOGUE.map((bot) => (
+                  <option key={bot.level} value={bot.level} disabled={!bot.available}>
+                    {bot.name}
+                    {bot.available ? '' : ' (čoskoro)'}
+                  </option>
+                ))}
+              </select>
+            </label>
+          ))}
+        </div>
+        <p className="hint">{describeBots(draft.bots.slice(0, draft.players))}</p>
+
         {verdict.errors.length > 0 ? (
           <p className="problem problem--error">{verdict.errors.map(explain).join(' ')}</p>
         ) : null}
@@ -104,6 +140,8 @@ export function App() {
       <Board
         state={game.state}
         actors={game.actors}
+        humanActors={game.humanActors}
+        isBot={game.isBot}
         movesFor={game.movesFor}
         play={game.play}
         seatName={seatName}
@@ -130,6 +168,16 @@ export function App() {
       </footer>
     </main>
   );
+}
+
+function describeBots(bots: readonly (BotLevel | null)[]): string {
+  const levels = bots.filter((b): b is BotLevel => b !== null);
+  if (levels.length === 0) return 'Všetky miesta hrajú ľudia na jednom zariadení.';
+  const names = [...new Set(levels)]
+    .map((l) => BOT_CATALOGUE.find((b) => b.level === l))
+    .filter((b) => b !== undefined)
+    .map((b) => `${b.name} — ${b.blurb}`);
+  return names.join(' ');
 }
 
 function explain(problem: { code: string; params?: Record<string, number | string> }): string {

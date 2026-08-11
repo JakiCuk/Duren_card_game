@@ -23,4 +23,8 @@ jobs:
       # it is the only check that reaches genuinely odd board states.
       - run: pnpm sim -- --games 4000 --players 2
       - run: pnpm sim -- --games 2000 --players 4 --deck 52 --seed 500000
+      # Bots drive the same driver, so this fuzzes the redaction path and the
+      # policies together.
+      - run: pnpm sim -- --games 1500 --bots 2,1
+      - run: pnpm sim -- --games 800 --bots 2,1,2
       - run: pnpm build

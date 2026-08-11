@@ -445,3 +445,15 @@ body {
   color: var(--muted);
   font-size: 0.85rem;
 }
+
+.panel__row--seats {
+  margin-top: 0.6rem;
+  padding-top: 0.6rem;
+  border-top: 1px solid var(--line);
+}
+
+.hint {
+  margin: 0.5rem 0 0;
+  font-size: 0.82rem;
+  color: var(--muted);
+}

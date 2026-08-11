@@ -1,26 +1,30 @@
 /**
- * Headless random-game driver.
+ * Headless game driver: random play for fuzzing, bot play for benchmarking.
  *
- * Its purpose is not to play well but to visit strange states fast: it walks
- * uniformly random legal moves and asserts every engine invariant after each
- * one. Any violation prints a `{config, seed, moves}` blob that drops straight
- * into a regression test.
+ * Every participant is asked for a move through a redacted `PlayerView`, never
+ * from the `GameState`. That is not just tidiness — it means the fuzzer
+ * exercises the redaction path on every single move of every single game.
  *
- * Run: `pnpm sim -- --games 10000 --players 2`
+ *   pnpm sim -- --games 10000 --players 2
+ *   pnpm sim -- --games 500 --bots 2,1
  */
 import { pathToFileURL } from 'node:url';
+import { createBot, isBotLevel, type BotLevel, type BotPolicy } from '../src/bots/index.js';
 import {
   actorsToAct,
   applyMove,
   assertInvariants,
   createGame,
-  ctxOf,
   hashState,
-  legalMoves,
+  moveKey,
+  redact,
+  redactEvents,
   type DeckSize,
   type GameState,
   type Move,
   type PlayerId,
+  type PlayerView,
+  type Seat,
 } from '../src/engine/index.js';
 import { nextInt, seedRng, type RngState } from '../src/engine/rng.js';
 import { DEFAULT_RULES, type RuleConfig } from '../src/shared/rules.js';
@@ -28,15 +32,21 @@ import { DEFAULT_RULES, type RuleConfig } from '../src/shared/rules.js';
 /** Guards against livelocks: no legal Durak game comes anywhere near this. */
 export const MAX_STEPS = 2000;
 
-export interface RandomGameOptions {
+export type Chooser = (view: PlayerView, seat: Seat) => Move;
+
+export interface PlayOptions {
   seed: number | string;
   players?: number;
   config?: RuleConfig;
-  /** Assert invariants after every move. Off makes the driver ~3x faster. */
+  /** One chooser per seat. Defaults to uniform random legal play. */
+  choosers?: readonly Chooser[];
+  /** Notified with each seat's redacted events; used to feed bot memories. */
+  onEvents?: (seat: Seat, events: ReturnType<typeof redactEvents>) => void;
+  /** Assert invariants after every move. Off makes the driver roughly 3x faster. */
   check?: boolean;
 }
 
-export interface RandomGameOutcome {
+export interface GameOutcome {
   seed: number | string;
   config: RuleConfig;
   playerIds: PlayerId[];
@@ -51,33 +61,48 @@ function pick<T>(rng: RngState, xs: readonly T[]): T {
   return xs[nextInt(rng, xs.length)]!;
 }
 
-export function playRandomGame(opts: RandomGameOptions): RandomGameOutcome {
+export function randomChooser(rng: RngState): Chooser {
+  return (view) => pick(rng, view.legalMoves);
+}
+
+export function playGame(opts: PlayOptions): GameOutcome {
   const playerCount = opts.players ?? 2;
   const config = opts.config ?? DEFAULT_RULES;
   const check = opts.check ?? true;
   const playerIds: PlayerId[] = Array.from({ length: playerCount }, (_, i) => `p${i}`);
 
   // The driver's randomness is seeded separately from the game's, so shuffling
-  // the deck and choosing moves never perturb one another.
+  // the deck and choosing among simultaneous actors never perturb one another.
   const rng = seedRng(`driver:${String(opts.seed)}`);
+  const fallback = randomChooser(rng);
+  const chooserFor = (seat: Seat): Chooser => opts.choosers?.[seat] ?? fallback;
 
-  let { state } = createGame({ players: playerIds, config, seed: opts.seed });
+  const created = createGame({ players: playerIds, config, seed: opts.seed });
+  let state = created.state;
   if (check) assertInvariants(state, 'after deal');
+  deliver(opts, created.events, playerCount);
 
   const moves: Move[] = [];
   while (state.phase === 'bout') {
-    if (moves.length >= MAX_STEPS) {
-      throw new Error(`Game exceeded ${MAX_STEPS} moves — livelock suspected`);
-    }
+    if (moves.length >= MAX_STEPS) throw new Error(`Game exceeded ${MAX_STEPS} moves — livelock suspected`);
+
     const actors = actorsToAct(state);
     if (actors.length === 0) throw new Error('No actor can move but the game is not finished');
 
     const seat = pick(rng, actors);
-    const options = legalMoves(ctxOf(state), seat);
-    const move = pick(rng, options);
+    const view = redact(state, seat);
+    const move = chooserFor(seat)(view, seat);
+
+    // A chooser only ever sees `view.legalMoves`, so anything else is a bug in
+    // the policy — catch it here rather than as a confusing engine throw.
+    if (!view.legalMoves.some((m) => moveKey(m) === moveKey(move))) {
+      throw new Error(`Seat ${seat} proposed ${moveKey(move)}, which is not among its legal moves`);
+    }
 
     moves.push(move);
-    state = applyMove(state, move).state;
+    const applied = applyMove(state, move);
+    state = applied.state;
+    deliver(opts, applied.events, playerCount);
     if (check) assertInvariants(state, `after ${moves.length} moves`);
   }
 
@@ -92,21 +117,59 @@ export function playRandomGame(opts: RandomGameOptions): RandomGameOutcome {
   };
 }
 
+function deliver(opts: PlayOptions, events: Parameters<typeof redactEvents>[0], players: number): void {
+  if (!opts.onEvents || events.length === 0) return;
+  for (let seat = 0; seat < players; seat++) opts.onEvents(seat, redactEvents(events, seat));
+}
+
+/** Backwards-compatible shorthand used by the invariant test suites. */
+export const playRandomGame = (opts: {
+  seed: number | string;
+  players?: number;
+  config?: RuleConfig;
+  check?: boolean;
+}): GameOutcome => playGame(opts);
+
+export interface BotGameOptions {
+  seed: number | string;
+  levels: readonly BotLevel[];
+  config?: RuleConfig;
+  check?: boolean;
+}
+
+/** A full game between bots, each wired to its own policy instance and memory. */
+export function playBotGame(opts: BotGameOptions): GameOutcome {
+  const bots: BotPolicy[] = opts.levels.map((level, seat) =>
+    createBot(level, seat, `${String(opts.seed)}:${seat}`),
+  );
+  return playGame({
+    seed: opts.seed,
+    players: opts.levels.length,
+    ...(opts.config ? { config: opts.config } : {}),
+    ...(opts.check !== undefined ? { check: opts.check } : {}),
+    choosers: bots.map((bot) => (view: PlayerView) => bot.chooseMove(view)),
+    onEvents: (seat, events) => bots[seat]?.observe(events),
+  });
+}
+
+// --- CLI --------------------------------------------------------------------
+
 interface Args {
   games: number;
   players: number;
   deck: DeckSize;
   seed: number;
   check: boolean;
+  levels: BotLevel[] | null;
 }
 
 function parseArgs(argv: readonly string[]): Args {
-  const args: Args = { games: 1000, players: 2, deck: 36, seed: 1, check: true };
+  const args: Args = { games: 1000, players: 2, deck: 36, seed: 1, check: true, levels: null };
   // `pnpm sim -- --games 10` forwards the bare `--` too; drop it.
-  argv = argv.filter((a) => a !== '--');
-  for (let i = 0; i < argv.length; i += 2) {
-    const key = argv[i];
-    const value = argv[i + 1];
+  const clean = argv.filter((a) => a !== '--');
+  for (let i = 0; i < clean.length; i += 2) {
+    const key = clean[i];
+    const value = clean[i + 1];
     if (key === undefined || value === undefined) break;
     switch (key) {
       case '--games': args.games = Number(value); break;
@@ -114,6 +177,13 @@ function parseArgs(argv: readonly string[]): Args {
       case '--deck': args.deck = Number(value) === 52 ? 52 : 36; break;
       case '--seed': args.seed = Number(value); break;
       case '--check': args.check = value !== 'false'; break;
+      case '--bots': {
+        const levels = value.split(',').map(Number);
+        if (!levels.every(isBotLevel)) throw new Error(`--bots takes levels 1..4, got ${value}`);
+        args.levels = levels;
+        args.players = levels.length;
+        break;
+      }
       default: throw new Error(`Unknown flag ${key}`);
     }
   }
@@ -126,32 +196,39 @@ function main(argv: readonly string[]): void {
   const started = Date.now();
   let totalSteps = 0;
   let draws = 0;
-  const durakCounts = new Map<string, number>();
+  const durakBySeat = new Map<number, number>();
 
   for (let i = 0; i < args.games; i++) {
     const seed = args.seed + i;
     try {
-      const outcome = playRandomGame({ seed, players: args.players, config, check: args.check });
+      const outcome = args.levels
+        ? playBotGame({ seed, levels: args.levels, config, check: args.check })
+        : playGame({ seed, players: args.players, config, check: args.check });
       totalSteps += outcome.steps;
       const durak = outcome.state.result?.durak;
       if (durak === null || durak === undefined) draws++;
-      else durakCounts.set(durak, (durakCounts.get(durak) ?? 0) + 1);
+      else {
+        const seat = outcome.playerIds.indexOf(durak);
+        durakBySeat.set(seat, (durakBySeat.get(seat) ?? 0) + 1);
+      }
     } catch (err) {
       console.error(`\nFAILED on seed ${seed}`);
-      console.error(JSON.stringify({ seed, players: args.players, config }, null, 2));
+      console.error(JSON.stringify({ seed, players: args.players, bots: args.levels, config }, null, 2));
       console.error(err);
       process.exit(1);
     }
   }
 
   const ms = Date.now() - started;
+  const who = args.levels ? `bots ${args.levels.join(' vs ')}` : `${args.players}p random`;
   console.log(
-    `${args.games} games, ${args.players}p, ${args.deck}-card deck: OK in ${ms} ms ` +
+    `${args.games} games, ${who}, ${args.deck}-card deck: OK in ${ms} ms ` +
       `(${(args.games / (ms / 1000)).toFixed(0)} games/s, ${(totalSteps / args.games).toFixed(1)} moves/game)`,
   );
-  console.log(`draws: ${draws}`);
-  for (const [id, n] of [...durakCounts].sort()) {
-    console.log(`  durak ${id}: ${n} (${((100 * n) / args.games).toFixed(1)} %)`);
+  console.log(`draws: ${draws} (${((100 * draws) / args.games).toFixed(1)} %)`);
+  for (const [seat, n] of [...durakBySeat].sort((a, b) => a[0] - b[0])) {
+    const label = args.levels ? `seat ${seat} (L${args.levels[seat]!})` : `seat ${seat}`;
+    console.log(`  durak ${label}: ${n} (${((100 * n) / args.games).toFixed(1)} %)`);
   }
 }
 

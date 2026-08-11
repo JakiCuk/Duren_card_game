@@ -18,9 +18,24 @@ pnpm dev          # Vite na :5173, Fastify na :3000 (Vite proxuje /ws a /api)
 pnpm lint
 pnpm typecheck
 pnpm test
-pnpm sim -- --games 10000    # fuzzer herného jadra
-pnpm bench                   # matica sily botov
+pnpm sim -- --games 10000     # fuzzer herného jadra
+pnpm sim -- --games 500 --bots 2,1   # to isté, ale hrajú boti
+pnpm duel -- --a 2 --b 1 --games 2000  # sila botov na párovaných rozdaniach
 ```
+
+## Boti
+
+| Úroveň | Názov | Čo vie |
+|---|---|---|
+| 1 | Začiatočník | Najlacnejšia legálna karta, šetrí tromfy, nič si nepamätá. |
+| 2 | Pokročilý | Fázy hry, tromfová ekonomika, rozhodnutie brať/brániť, neplytvá kartami na kolo, ktoré nemôže vyhrať. |
+| 3 | Počtár | *(pripravuje sa)* počíta odhodené karty a hypergeometrické pravdepodobnosti. |
+| 4 | Majster | *(pripravuje sa)* model súperovej ruky + cielené blafovanie. |
+
+Bot dostáva **len redigovaný `PlayerView`** — cudzie karty typovo nevidí a ESLint mu
+zakazuje importovať čokoľvek, čo drží `GameState`. Sila sa meria na párovaných
+rozdaniach (každé rozdanie sa hrá dvakrát s prehodenými miestami) s Wilsonovým
+intervalom spoľahlivosti; L2 poráža L1 na **60,2 % [58,5 – 61,8]** zo 4000 hier.
 
 ## Produkcia
 
