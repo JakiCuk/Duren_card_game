@@ -19,4 +19,8 @@ jobs:
       - run: pnpm lint
       - run: pnpm typecheck
       - run: pnpm test
+      # Random-play fuzzer over the engine invariants. Cheap enough per PR, and
+      # it is the only check that reaches genuinely odd board states.
+      - run: pnpm sim -- --games 4000 --players 2
+      - run: pnpm sim -- --games 2000 --players 4 --deck 52 --seed 500000
       - run: pnpm build

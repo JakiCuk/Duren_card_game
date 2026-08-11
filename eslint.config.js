@@ -8,9 +8,10 @@ import tseslint from 'typescript-eslint';
  * style preference, so it is enforced here rather than in review.
  */
 const purity = {
+  // Note: `Math` itself stays allowed — Math.imul/min/max are pure and the RNG
+  // needs them. Only Math.random is banned, via no-restricted-properties below.
   'no-restricted-globals': [
     'error',
-    { name: 'Math', message: 'Engine must not use Math.random(); take randomness from GameState.rng.' },
     { name: 'Date', message: 'Engine must be timeless; the server owns clocks.' },
     { name: 'process', message: 'Engine must not touch the environment.' },
     { name: 'console', message: 'Engine must not perform I/O.' },
