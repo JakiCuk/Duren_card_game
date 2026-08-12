@@ -10,8 +10,9 @@ bez účtov — izby sa vytvárajú anonymne a zdieľajú kódom.
 Rozhranie vychádza z návrhu **Durak Stôl** z Claude Design. Stôl je oválny a vždy sa
 točí tak, aby si sedel dole: tvoja ruka je rozložená do vejára pozdĺž spodnej hrany
 a pod pointerom sa karty nadvihujú, súperi sedia po obvode ako menovky s avatarom,
-rolou a počtom kariet, balík leží naľavo od kariet v hre a nad nimi sú údaje o hre.
-Pod stolom sú tlačidlá a riadok „kto je na ťahu". Vpravo pláva voliteľný prepis.
+rolou a počtom kariet, balík leží naľavo od kariet v hre. Pod stolom sú tlačidlá
+a jeden riadok s tvojím menom, rolou, tromfom a počtom kariet. Vpravo pláva
+voliteľný prepis.
 
 ### Karty
 
@@ -42,8 +43,7 @@ každý stack končí systémovým fallbackom, takže stroj bez siete dostane ro
 ### Nastavenia
 
 Nastavenia, pravidlá a chat sú **vyskakovacie panely v hlavičke**, nie bloky nad stolom —
-stôl tak dostane celé okno a knoby sa nad ním len na chvíľu otvoria. Tlačidlo
-**Priebeh** prepína prepis.
+stôl tak dostane celé okno a knoby sa nad ním len na chvíľu otvoria.
 
 V paneli **Nastavenia a nová hra** je aj:
 
@@ -58,7 +58,8 @@ V paneli **Nastavenia a nová hra** je aj:
   prihodíš. Pýta sa **až na konci kola**: keď je všetko na stole zbité (alebo obranca
   berie) a všetci ostatní útočníci už dohodili. Uprostred kola, kým obranca ešte
   odpovedá, sa nepýta na nič.
-- **Zobraziť údaje o hre** — tromf, kolo, zvyšok balíka a odhodené, nad tvojimi kartami.
+- **Zobraziť údaje o hre** — tromf pri tvojom mene. Zvyšok balíka je napísaný priamo
+  na balíku, takže sa to nikde nedubluje.
 - **Zobraziť prepis hry** — bočný stĺpec s tým, kto čo položil.
 
 Nastavenia sa pamätajú v prehliadači. Pauza botov platí pre hru na tomto zariadení;
