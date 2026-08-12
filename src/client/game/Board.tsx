@@ -16,9 +16,6 @@ import type { BoardModel, BoardSeat } from './model.js';
 const SUIT_GLYPH = ['♣', '♦', '♥', '♠'] as const;
 const SUIT_KEY = ['suit.clubs', 'suit.diamonds', 'suit.hearts', 'suit.spades'] as const;
 
-/** How long a bout stays on screen flying away after it is over. */
-const FLIGHT_MS = 520;
-
 export interface BoardProps {
   model: BoardModel;
   play: (move: Move) => void;
@@ -104,7 +101,7 @@ export function Board({
     return map;
   }, [model.seats, meIndex]);
 
-  const flight = useFlight(model);
+  const flight = useFlight(model, chairs);
   const prompt = awaitingThrowIn
     ? t('board.yourThrowIn')
     : model.controllable.length === 0 && !model.finished
@@ -147,6 +144,7 @@ export function Board({
             ) : (
               <span className="deck__empty">{t('board.deckEmpty')}</span>
             )}
+            {flight?.from === 'deck' ? <FlightLayer flight={flight} /> : null}
           </div>
 
           <div className="table" aria-label={t('board.table')}>
@@ -178,15 +176,7 @@ export function Board({
               ))
             )}
 
-            {flight === null ? null : (
-              <div className="flight" aria-hidden="true" style={flight.target}>
-                {flight.cards.map((card, i) => (
-                  <span key={`${card}-${i}`} className="flight__card">
-                    <CardFace card={card} size="md" />
-                  </span>
-                ))}
-              </div>
-            )}
+            {flight?.from === 'pile' ? <FlightLayer flight={flight} /> : null}
           </div>
         </div>
       </div>
@@ -247,38 +237,44 @@ export function Board({
   );
 }
 
-/**
- * Keeps a bout on screen for half a second after it leaves the table, flying
- * towards wherever it went.
- *
- * Cards vanishing between two renders is the one moment where the board stops
- * telling you what happened — you look up and six cards are simply gone, with
- * no way to tell whether the defender took them or they went to the discard.
- */
-function useFlight(model: BoardModel): { cards: CardId[]; target: CSSProperties } | null {
-  const previous = useRef<{ table: TableSlot[]; taking: boolean } | null>(null);
-  const [flight, setFlight] = useState<{ cards: CardId[]; target: CSSProperties } | null>(null);
-
-  useEffect(() => {
-    const before = previous.current;
-    previous.current = { table: model.table, taking: model.defenderTaking };
-    if (before === null || before.table.length === 0 || model.table.length > 0) return;
-
-    const cards = before.table.flatMap((p) => (p.defence === null ? [p.attack] : [p.attack, p.defence]));
-    // Taken cards go to the defender's chair; beaten ones go to the discard,
-    // which lives off to the right of the pile.
-    setFlight({
-      cards,
-      target: (before.taking
-        ? { '--tx': '0vw', '--ty': '34vh' }
-        : { '--tx': '22vw', '--ty': '-4vh' }) as CSSProperties,
-    });
-    const timer = setTimeout(() => setFlight(null), FLIGHT_MS);
-    return () => clearTimeout(timer);
-  }, [model.table, model.defenderTaking]);
-
-  return flight;
+/** One card in mid-air: where it is going, when it starts, and which way up. */
+export interface FlyingCard {
+  key: string;
+  card: CardId;
+  /** The side showing when it takes off. */
+  faceDown: boolean;
+  /** Turns over on the way, e.g. a taken bout going face down into a hand. */
+  flips: boolean;
+  delay: number;
+  target: CSSProperties;
 }
+
+/** A batch of cards leaving the same place at the same moment. */
+export interface Flight {
+  from: 'pile' | 'deck';
+  cards: FlyingCard[];
+  /** How long before the next batch may start. */
+  duration: number;
+}
+
+const FLY_MS = 520;
+const DEAL_MS = 420;
+const DEAL_GAP = 90;
+
+/** Where a chair sits relative to the middle of the table, in viewport units. */
+function deltaTo(seat: Seat, chairs: Map<Seat, CSSProperties>): { x: string; y: string } {
+  const chair = chairs.get(seat);
+  // No chair means it is your own seat, which the tray draws along the bottom.
+  if (chair === undefined) return { x: '0vw', y: '34vh' };
+  const left = Number.parseFloat(String(chair.left));
+  const top = Number.parseFloat(String(chair.top));
+  return { x: `${(left - 50).toFixed(1)}vw`, y: `${((top - 46) * 0.9).toFixed(1)}vh` };
+}
+
+const toward = (seat: Seat, chairs: Map<Seat, CSSProperties>): CSSProperties => {
+  const { x, y } = deltaTo(seat, chairs);
+  return { '--tx': x, '--ty': y } as CSSProperties;
+};
 
 /**
  * Which direction a card came from, as an offset the CSS animation starts at.
@@ -289,14 +285,180 @@ function useFlight(model: BoardModel): { cards: CardId[]; target: CSSProperties 
  * the pile alone would be a guess.
  */
 function originOf(seat: Seat, chairs: Map<Seat, CSSProperties>): CSSProperties {
-  const chair = chairs.get(seat);
-  if (chair === undefined) return { '--fx': '0vw', '--fy': '34vh' } as CSSProperties;
-  const left = Number.parseFloat(String(chair.left));
-  const top = Number.parseFloat(String(chair.top));
-  return {
-    '--fx': `${(left - 50).toFixed(1)}vw`,
-    '--fy': `${((top - 46) * 0.9).toFixed(1)}vh`,
-  } as CSSProperties;
+  const { x, y } = deltaTo(seat, chairs);
+  return { '--fx': x, '--fy': y } as CSSProperties;
+}
+
+/** Everything the flight planner needs to compare one turn against the next. */
+export interface Snapshot {
+  table: TableSlot[];
+  taking: boolean;
+  defender: Seat;
+  attacker: Seat;
+  deckCount: number;
+  trumpCard: CardId | null;
+  hands: Map<Seat, number>;
+  finished: boolean;
+}
+
+export const snapshot = (model: BoardModel): Snapshot => ({
+  table: model.table,
+  taking: model.defenderTaking,
+  defender: model.defenderSeat,
+  attacker: model.attackerSeat,
+  deckCount: model.deckCount,
+  trumpCard: model.trumpCard,
+  hands: new Map(model.seats.map((p) => [p.seat, p.handCount])),
+  finished: model.finished,
+});
+
+/**
+ * Works out what moved between two turns, and stages it.
+ *
+ * Cards vanishing between two renders is the one moment where the board stops
+ * telling you what happened — you look up and six cards are simply gone, with
+ * no way to tell whether the defender took them or they went to the discard.
+ * A resolved bout is two events in one move, so they are played in order: the
+ * pile empties first, then the deal that follows it.
+ */
+export function planFlights(
+  before: Snapshot,
+  after: Snapshot,
+  chairs: Map<Seat, CSSProperties>,
+): Flight[] {
+  const phases: Flight[] = [];
+
+  const cleared = before.table.length > 0 && after.table.length === 0;
+  const taken = cleared && before.taking ? before.defender : null;
+  if (cleared) {
+    const cards = before.table.flatMap((p) =>
+      p.defence === null ? [p.attack] : [p.attack, p.defence],
+    );
+    phases.push({
+      from: 'pile',
+      duration: FLY_MS,
+      cards: cards.map((card, i) => ({
+        key: `pile-${card}`,
+        card,
+        faceDown: false,
+        // Taken cards turn over as they go into a hand; a beaten bout stays
+        // face up all the way to the discard, because everyone saw it.
+        flips: taken !== null,
+        delay: i * 30,
+        target:
+          taken !== null
+            ? toward(taken, chairs)
+            : ({ '--tx': '26vw', '--ty': '-19vh' } as CSSProperties),
+      })),
+    });
+  }
+
+  // A hand grows either because its owner took the bout or because they drew.
+  // Only the second is a deal, so the take is subtracted back out.
+  const takenCount = taken === null ? 0 : before.table.reduce((n, p) => n + (p.defence === null ? 1 : 2), 0);
+  const drawn: { seat: Seat; count: number }[] = [];
+  for (const [seat, was] of before.hands) {
+    const now = after.hands.get(seat) ?? was;
+    const count = now - was - (seat === taken ? takenCount : 0);
+    if (count > 0) drawn.push({ seat, count });
+  }
+
+  // The engine deals to the opening attacker first, clockwise from there, and
+  // the defender last. Following that order is what makes the deal readable.
+  const order = [...drawn].sort((a, b) => dealRank(a.seat, before) - dealRank(b.seat, before));
+  const total = order.reduce((n, d) => n + d.count, 0);
+  if (total > 0) {
+    const cards: FlyingCard[] = [];
+    let i = 0;
+    for (const { seat, count } of order) {
+      for (let n = 0; n < count; n++, i++) {
+        // The bottom card lies face up under the pile; it turns over as it is
+        // dealt, and it is always the very last one out.
+        const isTrump = after.deckCount === 0 && before.trumpCard !== null && i === total - 1;
+        cards.push({
+          key: `deal-${seat}-${n}`,
+          card: isTrump ? before.trumpCard! : 0,
+          faceDown: !isTrump,
+          flips: isTrump,
+          delay: i * DEAL_GAP,
+          target: toward(seat, chairs),
+        });
+      }
+    }
+    phases.push({ from: 'deck', cards, duration: DEAL_MS + (total - 1) * DEAL_GAP });
+  }
+
+  return phases;
+}
+
+/** Deal order: opening attacker, then clockwise, defender last. */
+function dealRank(seat: Seat, before: Snapshot): number {
+  if (seat === before.defender) return 1000;
+  const seats = before.hands.size;
+  return (seat - before.attacker + seats) % seats;
+}
+
+function useFlight(model: BoardModel, chairs: Map<Seat, CSSProperties>): Flight | null {
+  const previous = useRef<Snapshot | null>(null);
+  const latestChairs = useRef(chairs);
+  latestChairs.current = chairs;
+  const [flight, setFlight] = useState<Flight | null>(null);
+
+  useEffect(() => {
+    const before = previous.current;
+    const after = snapshot(model);
+    previous.current = after;
+    if (before === null) return;
+
+    const phases = planFlights(before, after, latestChairs.current);
+    if (phases.length === 0) return;
+
+    let index = 0;
+    let timer: ReturnType<typeof setTimeout>;
+    const next = (): void => {
+      const phase = phases[index];
+      index++;
+      if (phase === undefined) {
+        setFlight(null);
+        return;
+      }
+      setFlight(phase);
+      timer = setTimeout(next, phase.duration);
+    };
+    next();
+    return () => {
+      clearTimeout(timer);
+      setFlight(null);
+    };
+  }, [model]);
+
+  return flight;
+}
+
+/** The cards currently in mid-air, drawn over whatever they are leaving. */
+function FlightLayer({ flight }: { flight: Flight }) {
+  return (
+    <div className={`flight flight--${flight.from}`} aria-hidden="true">
+      {flight.cards.map((c) => (
+        <span
+          key={c.key}
+          className={`flight__card${c.flips ? ' flight__card--flip' : ''}`}
+          style={{ ...c.target, animationDelay: `${c.delay}ms`, ['--delay' as string]: `${c.delay}ms` }}
+        >
+          <span className="flight__flip">
+            <span className="flight__face">
+              <CardFace card={c.card} faceDown={c.faceDown} size="md" />
+            </span>
+            {c.flips ? (
+              <span className="flight__face flight__face--back">
+                <CardFace card={c.card} faceDown={!c.faceDown} size="md" />
+              </span>
+            ) : null}
+          </span>
+        </span>
+      ))}
+    </div>
+  );
 }
 
 /** Somebody sitting across the table: a name chip and a small fan of backs. */
@@ -328,7 +490,7 @@ function Opponent({
         {player.team === null ? null : (
           <span className="seat__team">{t('team.name', { n: player.team + 1 })}</span>
         )}
-        <span className="seat__count">{player.handCount}</span>
+        <span className="seat__count">{t('board.cards', { count: player.handCount })}</span>
       </header>
 
       <div className="hand hand--fan">
@@ -381,8 +543,23 @@ function Me({
       className={`seat seat--me${roleClasses(player, model)}${canAct ? ' seat--turn' : ''}`}
     >
       <header className="seat__head">
-        <span className="turn__avatar">
-          <SeatIcon player={player} model={model} />
+        {/* Two lines that mirror the name and its caption beside them: what you
+            are doing on top, what beats everything underneath. */}
+        <span className="seat__badge">
+          <span className="seat__badgeIcon">
+            <SeatIcon player={player} model={model} />
+          </span>
+          {showStatus ? (
+            <span
+              className="seat__badgeTrump board__status"
+              title={t('board.trumpIs', { suit: t(SUIT_KEY[model.trump]) })}
+            >
+              {t('board.trump')}{' '}
+              <strong className={model.trump === 1 || model.trump === 2 ? 'red' : ''}>
+                {SUIT_GLYPH[model.trump]}
+              </strong>
+            </span>
+          ) : null}
         </span>
         <span className="seat__who">
           <span className="seat__name">{player.name}</span>
@@ -391,17 +568,6 @@ function Me({
         {player.team === null ? null : (
           <span className="seat__team">{t('team.name', { n: player.team + 1 })}</span>
         )}
-        {showStatus ? (
-          <span
-            className="chip board__status"
-            title={t('board.trumpIs', { suit: t(SUIT_KEY[model.trump]) })}
-          >
-            {t('board.trump')}{' '}
-            <strong className={model.trump === 1 || model.trump === 2 ? 'red' : ''}>
-              {SUIT_GLYPH[model.trump]}
-            </strong>
-          </span>
-        ) : null}
         <span className="seat__count">{t('board.cards', { count: player.handCount })}</span>
       </header>
 
@@ -466,10 +632,10 @@ const roleClasses = (p: BoardSeat, model: BoardModel): string =>
  * What the disc beside a name shows: the job that chair has right now.
  *
  * Initials were there first and said nothing the name beside them did not
- * already say. A sword, a shield or a plus answers the question you actually
- * have when you look up — who is attacking, who is defending, and who can still
- * pile on. A chair with nothing to do stays blank rather than inventing a
- * symbol for waiting.
+ * already say. Crossed swords for the attacker, a single sword for anyone who
+ * can still throw one in, a shield for the defender, and nothing at all for a
+ * chair with nothing to do. Drawn as SVG rather than emoji: emoji render
+ * differently on every system and ignore the text colour.
  */
 function SeatIcon({ player, model }: { player: BoardSeat; model: BoardModel }) {
   const t = useT();
@@ -478,31 +644,40 @@ function SeatIcon({ player, model }: { player: BoardSeat; model: BoardModel }) {
 
   const label = t(`role.${role === 'throwIn' ? 'canThrowIn' : role === 'shield' ? 'defends' : 'attacks'}`);
   return (
-    <svg className="seat__icon" viewBox="0 0 24 24" role="img" aria-label={label}>
+    <svg className="seat__icon" viewBox="0 0 24 24" role="img" aria-label={label} fill="currentColor">
       <title>{label}</title>
       {role === 'shield' ? (
-        <path
-          d="M12 2.4 4.6 5.3v6.1c0 4.6 3.1 8.6 7.4 10.2 4.3-1.6 7.4-5.6 7.4-10.2V5.3Z"
-          fill="none"
-          stroke="currentColor"
-          strokeWidth="1.9"
-          strokeLinejoin="round"
-        />
-      ) : null}
-      {role === 'sword' ? (
-        <g fill="none" stroke="currentColor" strokeWidth="1.9" strokeLinecap="round" strokeLinejoin="round">
-          <path d="M19.6 3.2 10 12.8l1.6 1.6 9.6-9.6V3.2Z" />
-          <path d="m8.2 14.6 1.2 1.2M4.4 16.6l3 3M6.2 21.4l-2.8.4.4-2.8" />
-        </g>
-      ) : null}
-      {role === 'throwIn' ? (
-        <g fill="none" stroke="currentColor" strokeWidth="2.1" strokeLinecap="round">
-          <path d="M12 5.6v12.8M5.6 12h12.8" />
-        </g>
-      ) : null}
+        <path d="M12 2.4 L4.6 5.3 v6.1 c0 4.6 3.1 8.6 7.4 10.2 c4.3-1.6 7.4-5.6 7.4-10.2 V5.3 Z" />
+      ) : (
+        <>
+          <Sword />
+          {role === 'sword' ? (
+            // The second blade is the first one mirrored, so the two always
+            // cross at the same point however the shape is retuned.
+            <g transform="translate(24 0) scale(-1 1)">
+              <Sword />
+            </g>
+          ) : null}
+        </>
+      )}
     </svg>
   );
 }
+
+/**
+ * One blade, hilt at the bottom left, point at the top right.
+ *
+ * Filled outlines rather than strokes: the shield beside it is solid, and a
+ * stroked sword next to a filled shield reads as two icons from two sets.
+ */
+const Sword = () => (
+  <>
+    <path d="M8.9 13.1 L19.3 2.7 L21.3 2.7 L21.3 4.7 L10.9 15.1 Z" />
+    <path d="M6.2 12.6 L7.6 11.2 L13 16.6 L11.6 18 Z" />
+    <path d="M8.2 14.6 L9.4 15.8 L6.3 18.9 L5.1 17.7 Z" />
+    <circle cx="4.4" cy="19.6" r="1.6" />
+  </>
+);
 
 /**
  * The one job a chair has this instant, or nothing.
