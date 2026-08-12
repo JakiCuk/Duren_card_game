@@ -42,11 +42,12 @@ describe('what flies where when a bout ends', () => {
     const before = base({ table: bout, taking: false });
     const [phase] = planFlights(before, base(), chairs);
 
+    expect(phase!.mode).toBe('bito');
     expect(phase!.from).toBe('pile');
     expect(phase!.cards).toHaveLength(4);
     // Everybody saw these cards, so there is nothing to hide on the way out.
     expect(phase!.cards.every((c) => !c.faceDown && !c.flips)).toBe(true);
-    expect(phase!.cards[0]!.target).toMatchObject({ '--tx': '26vw', '--ty': '-19vh' });
+    expect(phase!.cards[0]!.place).toMatchObject({ '--tx': '26vw', '--ty': '-19vh' });
   });
 
   it('turns a taken bout over and sends it to the hand that took it', () => {
@@ -55,11 +56,13 @@ describe('what flies where when a bout ends', () => {
     const after = base({ hands: new Map(before.hands).set(2, 10) });
     const [phase] = planFlights(before, after, chairs);
 
+    // A scoop, not a sweep — the layer gathers them before they travel.
+    expect(phase!.mode).toBe('take');
     expect(phase!.cards).toHaveLength(4);
     expect(phase!.cards.every((c) => c.flips)).toBe(true);
     // Seat 2 sits at the top of the table, so the cards travel up.
-    expect(phase!.cards[0]!.target).toMatchObject({ '--tx': '0.0vw' });
-    expect(Number.parseFloat(String(phase!.cards[0]!.target['--ty' as never]))).toBeLessThan(0);
+    expect(phase!.cards[0]!.place).toMatchObject({ '--tx': '0.0vw' });
+    expect(Number.parseFloat(String(phase!.cards[0]!.place['--ty' as never]))).toBeLessThan(0);
   });
 
   it('does not mistake the cards somebody took for cards they drew', () => {
@@ -135,5 +138,36 @@ describe('dealing from the deck', () => {
 
   it('stays out of the way when nothing moved', () => {
     expect(planFlights(base(), base(), chairs)).toEqual([]);
+  });
+
+  it('deals nothing once the deck is empty, however hands change', () => {
+    // Regression from a six-handed endgame: a hand growing was taken as proof
+    // that cards had been drawn, so an exhausted deck kept dealing phantoms.
+    const before = base({ deckCount: 0, table: [{ attack: card('7C'), defence: null }], taking: true });
+    const after = base({
+      deckCount: 0,
+      hands: new Map<Seat, number>([
+        [0, 6],
+        [1, 7],
+        [2, 6],
+        [3, 6],
+      ]),
+    });
+    expect(planFlights(before, after, chairs).map((p) => p.from)).toEqual(['pile']);
+  });
+
+  it('never deals more cards than the deck actually lost', () => {
+    const before = base({ deckCount: 1 });
+    const after = base({
+      deckCount: 0,
+      hands: new Map<Seat, number>([
+        [0, 8],
+        [1, 8],
+        [2, 6],
+        [3, 6],
+      ]),
+    });
+    const [phase] = planFlights(before, after, chairs);
+    expect(phase!.cards).toHaveLength(1);
   });
 });

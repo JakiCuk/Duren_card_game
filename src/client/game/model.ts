@@ -4,6 +4,8 @@ import {
   legalMoves,
   viewCtx,
   type CardId,
+  type GameEvent,
+  type PublicEvent,
   type GameResult,
   type GameState,
   type Move,
@@ -160,4 +162,23 @@ export function modelFromView(view: PlayerView, opts: RemoteModelOptions): Board
     controllable: iCanAct && mySeat !== null ? [mySeat] : [],
     movesFor: (seat) => (seat === mySeat && !view.finished ? legalMoves(viewCtx(view), seat) : []),
   };
+}
+
+/**
+ * Who put each card on the table, read off the event stream.
+ *
+ * The board has a position, not a history, so from the pile alone it cannot
+ * tell a throw-in by a third player from the opening attack — both are just
+ * cards lying there. Without this an animation can only guess, and it guesses
+ * wrong exactly when it matters: the moment somebody else piles on.
+ *
+ * Keyed by card because a card is on the table at most once at a time, so a
+ * later play simply replaces an earlier one.
+ */
+export function playedBy(events: readonly (GameEvent | PublicEvent)[]): Map<CardId, Seat> {
+  const map = new Map<CardId, Seat>();
+  for (const e of events) {
+    if (e.k === 'attack' || e.k === 'defend' || e.k === 'transfer') map.set(e.card, e.seat);
+  }
+  return map;
 }
