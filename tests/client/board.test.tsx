@@ -385,3 +385,50 @@ describe('game settings', () => {
     });
   }, 30_000);
 });
+
+describe('table layout', () => {
+  it('folds the new-game panel away so the table gets the room', () => {
+    renderApp();
+    const setup = screen.getByText('Nová hra a pravidlá').closest('details')!;
+    expect(setup.hasAttribute('open')).toBe(false);
+  });
+
+  it('keeps the deck inside the centre, clear of every seat', () => {
+    // Regression: the deck used to sit on the left edge of the felt, which is
+    // exactly where the left-hand player sits at three and four players.
+    renderApp();
+    const deck = document.querySelector('.felt__deck');
+    expect(deck).not.toBeNull();
+    expect(deck!.closest('.felt__centre')).not.toBeNull();
+    expect(document.querySelectorAll('.seat--across .felt__deck')).toHaveLength(0);
+  });
+
+  it('shows the game info between your name and your cards', async () => {
+    const user = userEvent.setup();
+    renderApp();
+
+    const me = document.querySelector('.seat--me')!;
+    const status = me.querySelector('.board__status');
+    expect(status, 'the info row belongs to the player, not the page header').not.toBeNull();
+    expect(status!.textContent).toContain('Tromf');
+
+    // Order matters: name, then info, then the hand.
+    const children = Array.from(me.children);
+    expect(children.indexOf(me.querySelector('.seat__head')!)).toBeLessThan(
+      children.indexOf(status!),
+    );
+    expect(children.indexOf(status!)).toBeLessThan(children.indexOf(me.querySelector('.hand')!));
+
+    const panel = screen.getByText('Nastavenia hry').closest('details')!;
+    await user.click(within(panel).getByText('Nastavenia hry'));
+    await user.click(within(panel).getByLabelText(/Zobraziť údaje o hre/));
+    expect(document.querySelector('.seat--me .board__status')).toBeNull();
+  });
+
+  it('gives your own hand the biggest cards on the table', () => {
+    renderApp();
+    expect(document.querySelectorAll('.seat--me .hand .card--lg').length).toBe(6);
+    // Opponents are fanned small; they are information, not targets.
+    expect(document.querySelectorAll('.seat--across .hand .card--sm').length).toBeGreaterThan(0);
+  });
+});

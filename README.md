@@ -8,8 +8,12 @@ bez účtov — izby sa vytvárajú anonymne a zdieľajú kódom.
 ## Vzhľad a nastavenia
 
 Stôl je okrúhly a vždy sa točí tak, aby si sedel dole: tvoje karty pozdĺž spodnej
-hrany, ostatní hráči okolo, kôpka v strede a tlačidlá priamo pod ňou. Nad stolom sú
-informácie o tromfe, kole a balíku, vpravo voliteľný prepis odohraných kariet.
+hrany a najväčšie zo všetkých, ostatní hráči rozostavaní okolo, balík aj kôpka
+v strede a tlačidlá priamo pod ňou. Údaje o hre sú medzi tvojím menom a kartami,
+vpravo je voliteľný prepis.
+
+Panel *Nová hra a pravidlá* je zložený, aby stôl dostal celú výšku okna — rozbalíš
+ho, keď chceš zmeniť rozdanie alebo pravidlá.
 
 Pod hlavičkou je zložené **Nastavenia hry** (schované, kým ich nerozbalíš):
 
@@ -17,6 +21,7 @@ Pod hlavičkou je zložené **Nastavenia hry** (schované, kým ich nerozbalíš
 - **Počkať na mňa, keď môžem prihodiť** — boti sa zastavia, kým nezahráš alebo
   nestlačíš „Bito". Bez toho ti pri troch a viacerých hráčoch môže iný útočník
   prihodiť skôr, než si vôbec všimneš, že si mohol aj ty.
+- **Zobraziť údaje o hre** — tromf, kolo, zvyšok balíka a odhodené, nad tvojimi kartami.
 - **Zobraziť prepis hry** — bočný stĺpec s tým, kto čo položil.
 
 Nastavenia sa pamätajú v prehliadači. Pauza botov platí pre hru na tomto zariadení;

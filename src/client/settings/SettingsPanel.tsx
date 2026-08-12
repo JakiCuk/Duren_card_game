@@ -52,6 +52,18 @@ export function SettingsPanel({ settings, set }: SettingsPanelProps) {
         <label className="toggle">
           <input
             type="checkbox"
+            checked={settings.showStatus}
+            onChange={(e) => set('showStatus', e.target.checked)}
+          />
+          <span>
+            {t('settings.showStatus')}
+            <small>{t('settings.showStatus.hint')}</small>
+          </span>
+        </label>
+
+        <label className="toggle">
+          <input
+            type="checkbox"
             checked={settings.showLog}
             onChange={(e) => set('showLog', e.target.checked)}
           />

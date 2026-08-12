@@ -12,12 +12,15 @@ export interface Settings {
   holdForThrowIn: boolean;
   /** Show the running transcript of played cards. */
   showLog: boolean;
+  /** Show the trump / bout / deck / discard row above your hand. */
+  showStatus: boolean;
 }
 
 export const DEFAULT_SETTINGS: Settings = {
   botDelayMs: 900,
   holdForThrowIn: true,
   showLog: true,
+  showStatus: true,
 };
 
 export const BOT_DELAY_RANGE = { min: 0, max: 4000, step: 100 } as const;
@@ -37,6 +40,7 @@ function load(): Settings {
           : DEFAULT_SETTINGS.botDelayMs,
       holdForThrowIn: parsed.holdForThrowIn ?? DEFAULT_SETTINGS.holdForThrowIn,
       showLog: parsed.showLog ?? DEFAULT_SETTINGS.showLog,
+      showStatus: parsed.showStatus ?? DEFAULT_SETTINGS.showStatus,
     };
   } catch {
     // A corrupted entry is not worth a broken page.

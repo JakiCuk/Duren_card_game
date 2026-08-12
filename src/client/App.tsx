@@ -99,7 +99,8 @@ function LocalGame({ settings }: { settings: Settings }) {
     <>
       <p className="lede">{t('mode.localLede')}</p>
 
-      <section className="panel">
+      <details className="panel panel--setup">
+        <summary>{t('setup.title')}</summary>
         <div className="panel__row">
           <label>
             {t('field.players')}
@@ -198,7 +199,7 @@ function LocalGame({ settings }: { settings: Settings }) {
             {verdict.warnings.map((p) => explain(p, t)).join(' ')}
           </p>
         ) : null}
-      </section>
+      </details>
 
       {game.state.result ? <ResultBanner result={game.state.result} seatName={localSeatName} /> : null}
 
@@ -207,6 +208,7 @@ function LocalGame({ settings }: { settings: Settings }) {
           model={model}
           play={game.play}
           awaitingThrowIn={settings.holdForThrowIn && game.pendingThrowIn !== null}
+          showStatus={settings.showStatus}
         />
         {settings.showLog ? <Log lines={log} /> : null}
       </div>
@@ -331,6 +333,7 @@ function OnlineGame({ settings }: { settings: Settings }) {
           <div className="stage">
             <Board
               model={model}
+              showStatus={settings.showStatus}
               play={(move) => {
                 if (net.view) net.move(net.view.seq, move);
               }}

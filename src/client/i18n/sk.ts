@@ -74,6 +74,9 @@ export const sk: Dictionary = {
   'settings.showLog': 'Zobraziť prepis hry',
   'settings.showLog.hint': 'Bočný stĺpec s tým, kto čo položil.',
   'board.yourThrowIn': 'Môžeš prihodiť — zahraj kartu alebo stlač „Bito“.',
+  'settings.showStatus': 'Zobraziť údaje o hre',
+  'settings.showStatus.hint': 'Tromf, kolo, zvyšok balíka a odhodené — nad tvojimi kartami.',
+  'setup.title': 'Nová hra a pravidlá',
   'card.back': 'Rubová strana',
   'card.deckOf': 'Balík má {count} kariet',
 

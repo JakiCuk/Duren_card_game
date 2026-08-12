@@ -79,6 +79,9 @@ export const uk: Dictionary = {
   'settings.showLog': 'Показувати перебіг гри',
   'settings.showLog.hint': 'Бічна колонка з тим, хто що поклав.',
   'board.yourThrowIn': 'Можеш підкинути — зіграй карту або натисни «Біто».',
+  'settings.showStatus': 'Показувати дані гри',
+  'settings.showStatus.hint': 'Козир, коло, залишок колоди та відбій — над твоїми картами.',
+  'setup.title': 'Нова гра та правила',
   'card.back': 'Сорочка',
   'card.deckOf': 'У колоді {count} карт',
 

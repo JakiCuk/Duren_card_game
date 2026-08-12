@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState, type CSSProperties } from 'react';
+import { useEffect, useMemo, useState, type CSSProperties, type ReactNode } from 'react';
 import { cardCode, rankOf, suitOf, type CardId, type Move, type Seat } from '../../engine/index.js';
 import { CardBackStack, CardFace } from '../cards/CardFace.js';
 import { useT, type Translate } from '../i18n/index.js';
@@ -12,6 +12,8 @@ export interface BoardProps {
   play: (move: Move) => void;
   /** True while this player could still add a card, so the table can say so. */
   awaitingThrowIn?: boolean;
+  /** Trump, bout and pile counts, shown just above your own hand. */
+  showStatus?: boolean;
 }
 
 /**
@@ -23,7 +25,7 @@ export interface BoardProps {
  * rotates to the bottom, so the layout never asks you to work out which of six
  * panels is yours.
  */
-export function Board({ model, play, awaitingThrowIn = false }: BoardProps) {
+export function Board({ model, play, awaitingThrowIn = false, showStatus = true }: BoardProps) {
   const t = useT();
   const [seat, setSeat] = useState<Seat>(model.controllable[0] ?? 0);
   const [slot, setSlot] = useState(0);
@@ -67,41 +69,43 @@ export function Board({ model, play, awaitingThrowIn = false }: BoardProps) {
   const seatName = (s: Seat): string =>
     model.seats.find((x) => x.seat === s)?.name ?? t('player.seat', { n: s + 1 });
 
+  const status = showStatus ? (
+    <div className="board__status">
+      <span className="chip" title={t('board.trumpIs', { suit: t(SUIT_KEY[model.trump]) })}>
+        {t('board.trump')}{' '}
+        <strong className={model.trump === 1 || model.trump === 2 ? 'red' : ''}>
+          {SUIT_GLYPH[model.trump]}
+        </strong>
+      </span>
+      <span className="chip">{t('board.bout', { n: model.boutIndex + 1 })}</span>
+      <span className="chip">{t('board.deck', { n: model.deckCount })}</span>
+      <span className="chip">{t('board.discard', { n: model.discardCount })}</span>
+    </div>
+  ) : null;
+
   return (
     <div className="board">
-      <div className="board__status">
-        <span className="chip" title={t('board.trumpIs', { suit: t(SUIT_KEY[model.trump]) })}>
-          {t('board.trump')}{' '}
-          <strong className={model.trump === 1 || model.trump === 2 ? 'red' : ''}>
-            {SUIT_GLYPH[model.trump]}
-          </strong>
-        </span>
-        <span className="chip">{t('board.bout', { n: model.boutIndex + 1 })}</span>
-        <span className="chip">{t('board.deck', { n: model.deckCount })}</span>
-        <span className="chip">{t('board.discard', { n: model.discardCount })}</span>
-      </div>
-
       <div className="felt">
         {others.map((p, i) => (
           <Opponent key={p.seat} player={p} model={model} style={seatPosition(i + 1, model.seats.length)} />
         ))}
 
-        <div className="felt__deck">
-          {model.deckCount > 0 ? (
-            <>
-              {model.trumpCard !== null ? (
-                <span className="deck__trump">
-                  <CardFace card={model.trumpCard} size="sm" title={t('board.trumpCard')} />
-                </span>
-              ) : null}
-              <CardBackStack count={model.deckCount} size="sm" />
-            </>
-          ) : (
-            <span className="deck__empty">{t('board.deckEmpty')}</span>
-          )}
-        </div>
-
         <div className="felt__centre">
+          <div className="felt__deck">
+            {model.deckCount > 0 ? (
+              <>
+                {model.trumpCard !== null ? (
+                  <span className="deck__trump">
+                    <CardFace card={model.trumpCard} size="sm" title={t('board.trumpCard')} />
+                  </span>
+                ) : null}
+                <CardBackStack count={model.deckCount} size="sm" />
+              </>
+            ) : (
+              <span className="deck__empty">{t('board.deckEmpty')}</span>
+            )}
+          </div>
+
           <div className="table" aria-label={t('board.table')}>
             {model.table.length === 0 ? (
               <p className="table__hint">
@@ -178,7 +182,7 @@ export function Board({ model, play, awaitingThrowIn = false }: BoardProps) {
         </div>
       </div>
 
-      <Me player={me} model={model} playable={playableCards} play={play} />
+      <Me player={me} model={model} playable={playableCards} play={play} status={status} />
     </div>
   );
 }
@@ -228,11 +232,13 @@ function Me({
   model,
   playable,
   play,
+  status,
 }: {
   player: BoardSeat;
   model: BoardModel;
   playable: Map<CardId, Move>;
   play: (move: Move) => void;
+  status: ReactNode;
 }) {
   const t = useT();
   const canAct = model.actors.includes(player.seat);
@@ -248,10 +254,12 @@ function Me({
         <span className="seat__count">{t('board.cards', { count: player.handCount })}</span>
       </header>
 
+      {status}
+
       <div className="hand">
         {player.hand === null
           ? Array.from({ length: player.handCount }, (_, i) => (
-              <CardFace key={i} card={0} faceDown size="md" />
+              <CardFace key={i} card={0} faceDown size="lg" />
             ))
           : sortForDisplay(player.hand, model.trump).map((cardId) => {
               const move = playable.get(cardId);
@@ -259,7 +267,7 @@ function Me({
                 <CardFace
                   key={cardId}
                   card={cardId}
-                  size="md"
+                  size="lg"
                   muted={move === undefined && canAct}
                   {...(move ? { onClick: () => play(move) } : {})}
                 />
