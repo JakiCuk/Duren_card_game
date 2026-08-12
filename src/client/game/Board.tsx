@@ -12,18 +12,18 @@ export interface BoardProps {
   play: (move: Move) => void;
   /** True while this player could still add a card, so the table can say so. */
   awaitingThrowIn?: boolean;
-  /** Trump, bout and pile counts, shown just above your own hand. */
+  /** Trump, bout and pile counts, shown just above the cards in play. */
   showStatus?: boolean;
 }
 
 /**
  * A round table seen from your own chair.
  *
- * Everything sits where it would if you pulled up a seat: your hand along the
- * bottom edge, the other players around the far side, the pile in the middle,
- * and the buttons that act on it directly underneath. Whoever you are playing
- * rotates to the bottom, so the layout never asks you to work out which of six
- * panels is yours.
+ * Everything sits where it would if you pulled up a seat: your hand fanned
+ * along the bottom edge, the other players around the far side, the draw pile
+ * beside the cards in play, and the buttons that act on them directly
+ * underneath. Whoever you are playing rotates to the bottom, so the layout
+ * never asks you to work out which of six chairs is yours.
  */
 export function Board({ model, play, awaitingThrowIn = false, showStatus = true }: BoardProps) {
   const t = useT();
@@ -75,44 +75,52 @@ export function Board({ model, play, awaitingThrowIn = false, showStatus = true 
   const seatName = (s: Seat): string =>
     model.seats.find((x) => x.seat === s)?.name ?? t('player.seat', { n: s + 1 });
 
-  const status = showStatus ? (
-    <div className="board__status">
-      <span className="chip" title={t('board.trumpIs', { suit: t(SUIT_KEY[model.trump]) })}>
-        {t('board.trump')}{' '}
-        <strong className={model.trump === 1 || model.trump === 2 ? 'red' : ''}>
-          {SUIT_GLYPH[model.trump]}
-        </strong>
-      </span>
-      <span className="chip">{t('board.bout', { n: model.boutIndex + 1 })}</span>
-      <span className="chip">{t('board.deck', { n: model.deckCount })}</span>
-      <span className="chip">{t('board.discard', { n: model.discardCount })}</span>
-    </div>
-  ) : null;
-
   return (
     <div className="board">
-      <div className="felt">
-        <div className="felt__deck">
-          {model.deckCount > 0 ? (
-            <>
-              {model.trumpCard !== null ? (
-                <span className="deck__trump">
-                  <CardFace card={model.trumpCard} size="sm" title={t('board.trumpCard')} />
+      <div className="felt" />
+
+      {others.map((p, i) => (
+        <Opponent
+          key={p.seat}
+          player={p}
+          model={model}
+          style={seatPosition(i, others.length + 1)}
+        />
+      ))}
+
+      <div className="felt__centre">
+        {showStatus ? (
+          <div className="board__status">
+            <span className="chip" title={t('board.trumpIs', { suit: t(SUIT_KEY[model.trump]) })}>
+              {t('board.trump')}{' '}
+              <strong className={model.trump === 1 || model.trump === 2 ? 'red' : ''}>
+                {SUIT_GLYPH[model.trump]}
+              </strong>
+            </span>
+            <span className="chip">{t('board.bout', { n: model.boutIndex + 1 })}</span>
+            <span className="chip">{t('board.deck', { n: model.deckCount })}</span>
+            <span className="chip">{t('board.discard', { n: model.discardCount })}</span>
+          </div>
+        ) : null}
+
+        <div className="felt__pile">
+          <div className="felt__deck">
+            {model.deckCount > 0 ? (
+              <>
+                {model.trumpCard !== null ? (
+                  <span className="deck__trump">
+                    <CardFace card={model.trumpCard} size="md" title={t('board.trumpCard')} />
+                  </span>
+                ) : null}
+                <span className="deck__pile">
+                  <CardBackStack count={model.deckCount} size="md" />
+                  <span className="deck__count">{model.deckCount}</span>
                 </span>
-              ) : null}
-              <CardBackStack count={model.deckCount} size="sm" />
-            </>
-          ) : (
-            <span className="deck__empty">{t('board.deckEmpty')}</span>
-          )}
-        </div>
-
-        {others.map((p, i) => (
-          <Opponent key={p.seat} player={p} model={model} style={seatPosition(i + 1, others.length)} />
-        ))}
-
-        <div className="felt__centre">
-          {status}
+              </>
+            ) : (
+              <span className="deck__empty">{t('board.deckEmpty')}</span>
+            )}
+          </div>
 
           <div className="table" aria-label={t('board.table')}>
             {model.table.length === 0 ? (
@@ -142,60 +150,92 @@ export function Board({ model, play, awaitingThrowIn = false, showStatus = true 
               ))
             )}
           </div>
-
-          <div className="actions">
-            {takeMove ? (
-              <button type="button" className="btn btn--warn" onClick={() => play(takeMove)}>
-                {t('action.take')}
-              </button>
-            ) : null}
-            {transfers.map((m) => (
-              <button
-                key={`${m.card}-${String(m.reveal)}`}
-                type="button"
-                className="btn"
-                onClick={() => play(m)}
-                title={m.reveal ? t('rules.reveal.hint') : t('rules.transfer.hint')}
-              >
-                {m.reveal
-                  ? t('action.transferReveal', { card: cardCode(m.card) })
-                  : t('action.transfer', { card: cardCode(m.card) })}
-              </button>
-            ))}
-            {passMove ? (
-              <button
-                type="button"
-                className={`btn${awaitingThrowIn ? ' btn--primary' : ''}`}
-                onClick={() => play(passMove)}
-              >
-                {t('action.pass')}
-              </button>
-            ) : null}
-            {model.controllable
-              .filter((s) => s !== seat)
-              .map((s) => (
-                <button key={s} type="button" className="btn btn--ghost" onClick={() => setSeat(s)}>
-                  {t('action.switchTo', { name: seatName(s) })}
-                </button>
-              ))}
-          </div>
-
-          <p className={`felt__prompt${awaitingThrowIn ? ' felt__prompt--wait' : ''}`}>
-            {awaitingThrowIn
-              ? t('board.yourThrowIn')
-              : model.controllable.length === 0 && !model.finished
-                ? t('board.waiting')
-                : ' '}
-          </p>
         </div>
       </div>
 
-      <Me player={me} model={model} playable={playableCards} play={play} />
+      <div className="tray">
+        <div className="actions">
+          {takeMove ? (
+            <button type="button" className="btn btn--warn" onClick={() => play(takeMove)}>
+              {t('action.take')}
+            </button>
+          ) : null}
+          {transfers.map((m) => (
+            <button
+              key={`${m.card}-${String(m.reveal)}`}
+              type="button"
+              className="btn"
+              onClick={() => play(m)}
+              title={m.reveal ? t('rules.reveal.hint') : t('rules.transfer.hint')}
+            >
+              {m.reveal
+                ? t('action.transferReveal', { card: cardCode(m.card) })
+                : t('action.transfer', { card: cardCode(m.card) })}
+            </button>
+          ))}
+          {passMove ? (
+            <button
+              type="button"
+              className={`btn${awaitingThrowIn ? ' btn--primary' : ''}`}
+              onClick={() => play(passMove)}
+            >
+              {t('action.pass')}
+            </button>
+          ) : null}
+          {model.controllable
+            .filter((s) => s !== seat)
+            .map((s) => (
+              <button key={s} type="button" className="btn btn--ghost" onClick={() => setSeat(s)}>
+                {t('action.switchTo', { name: seatName(s) })}
+              </button>
+            ))}
+        </div>
+
+        <Turn player={me} model={model} awaitingThrowIn={awaitingThrowIn} />
+
+        <Me player={me} model={model} playable={playableCards} play={play} />
+      </div>
     </div>
   );
 }
 
-/** Somebody sitting across the table: a name plate and a fan of backs. */
+/** The one line that says whose move it is, and what they are doing about it. */
+function Turn({
+  player,
+  model,
+  awaitingThrowIn,
+}: {
+  player: BoardSeat;
+  model: BoardModel;
+  awaitingThrowIn: boolean;
+}) {
+  const t = useT();
+  const mine = model.controllable.includes(player.seat);
+  const waiting = model.controllable.length === 0 && !model.finished;
+
+  const text = awaitingThrowIn
+    ? t('board.yourThrowIn')
+    : model.finished
+      ? t('board.gameOver')
+      : mine
+        ? player.seat === model.defenderSeat
+          ? t('turn.you.defend')
+          : player.seat === model.attackerSeat
+            ? t('turn.you.attack')
+            : t('turn.you.act')
+        : waiting
+          ? t('board.waiting')
+          : ' ';
+
+  return (
+    <div className={`turn${mine || awaitingThrowIn ? ' turn--mine' : ''}`}>
+      <span className="turn__avatar">{initials(player.name)}</span>
+      <p className={`felt__prompt${awaitingThrowIn ? ' felt__prompt--wait' : ''}`}>{text}</p>
+    </div>
+  );
+}
+
+/** Somebody sitting across the table: a name chip and a small fan of backs. */
 function Opponent({
   player,
   model,
@@ -206,6 +246,7 @@ function Opponent({
   style: CSSProperties;
 }) {
   const t = useT();
+  const roles = roleLabels(player, model, t);
   return (
     <section
       aria-label={player.name}
@@ -213,13 +254,17 @@ function Opponent({
       style={style}
     >
       <header className="seat__head">
-        <span className="seat__name">{player.name}</span>
+        <span className="avatar">{initials(player.name)}</span>
+        <span className="seat__who">
+          <span className="seat__name">{player.name}</span>
+          <span className="seat__roles">{roles.join(' · ') || t('role.idle')}</span>
+        </span>
         {player.team === null ? null : (
           <span className="seat__team">{t('team.name', { n: player.team + 1 })}</span>
         )}
-        <span className="seat__count">{t('board.cards', { count: player.handCount })}</span>
+        <span className="seat__count">{player.handCount}</span>
       </header>
-      <span className="seat__roles">{roleLabels(player, model, t).join(' · ') || ' '}</span>
+
       <div className="hand hand--fan">
         {player.hand === null
           ? // Somebody else's cards must never reach the DOM, not even as an alt
@@ -234,7 +279,7 @@ function Opponent({
   );
 }
 
-/** The near edge of the table: your own hand, large and clickable. */
+/** The near edge of the table: your own hand, large, fanned and clickable. */
 function Me({
   player,
   model,
@@ -248,6 +293,8 @@ function Me({
 }) {
   const t = useT();
   const canAct = model.actors.includes(player.seat);
+  const hand = player.hand === null ? null : sortForDisplay(player.hand, model.trump);
+  const count = hand?.length ?? player.handCount;
 
   return (
     <section aria-label={player.name} className={`seat seat--me${roleClasses(player, model)}`}>
@@ -256,22 +303,23 @@ function Me({
         {player.team === null ? null : (
           <span className="seat__team">{t('team.name', { n: player.team + 1 })}</span>
         )}
-        <span className="seat__roles">{roleLabels(player, model, t).join(' · ') || ' '}</span>
+        <span className="seat__roles">{roleLabels(player, model, t).join(' · ') || ' '}</span>
         <span className="seat__count">{t('board.cards', { count: player.handCount })}</span>
       </header>
 
       <div className="hand">
-        {player.hand === null
+        {hand === null
           ? Array.from({ length: player.handCount }, (_, i) => (
-              <CardFace key={i} card={0} faceDown size="lg" />
+              <CardFace key={i} card={0} faceDown size="lg" style={fan(i, count)} />
             ))
-          : sortForDisplay(player.hand, model.trump).map((cardId) => {
+          : hand.map((cardId, i) => {
               const move = playable.get(cardId);
               return (
                 <CardFace
                   key={cardId}
                   card={cardId}
                   size="lg"
+                  style={fan(i, count)}
                   muted={move === undefined && canAct}
                   {...(move ? { onClick: () => play(move) } : {})}
                 />
@@ -281,6 +329,18 @@ function Me({
       </div>
     </section>
   );
+}
+
+/**
+ * A hand held in one hand: cards splay outwards and dip at the edges.
+ *
+ * The rotation is what makes an overlapping row read as a fan rather than as a
+ * stack — without it the cards look shuffled together and you cannot tell where
+ * one ends.
+ */
+function fan(index: number, count: number): CSSProperties {
+  const off = index - (count - 1) / 2;
+  return { transform: `translateY(${off * off * 2}px) rotate(${off * 5}deg)`, zIndex: index };
 }
 
 function roleLabels(p: BoardSeat, model: BoardModel, t: Translate): string[] {
@@ -305,21 +365,28 @@ const roleClasses = (p: BoardSeat, model: BoardModel): string =>
   `${p.team === null ? '' : ` seat--team${p.team}`}`;
 
 /**
- * Opponents sit along the far edge, spread across the top of the table.
- *
- * An evenly spaced ring would put somebody at the left edge at four players and
- * at the lower left at five — which is where the deck lies. Keeping everybody
- * on the upper arc leaves that corner free whatever the table size, and it also
- * reads more like a real table, where you face the other players rather than
- * sitting beside them.
+ * Two letters for the avatar disc: initials when the name has words to take
+ * them from, otherwise the first two characters.
  */
-function seatPosition(index: number, others: number): CSSProperties {
-  const from = (200 * Math.PI) / 180;
-  const to = (340 * Math.PI) / 180;
-  const angle = others === 1 ? (270 * Math.PI) / 180 : from + ((index - 1) * (to - from)) / (others - 1);
+function initials(name: string): string {
+  const words = name.trim().split(/\s+/).filter(Boolean);
+  if (words.length >= 2) return (words[0]![0]! + words[1]![0]!).toUpperCase();
+  return (words[0] ?? '?').slice(0, 2).toUpperCase();
+}
+
+/**
+ * Chairs around an ellipse, yours at the bottom.
+ *
+ * `total` counts you as well, so the angles divide the whole table and the
+ * remaining players are spread evenly across the other side however many of
+ * them there are. Your own seat, index `total - 1`, lands at the bottom — which
+ * is where the tray draws it instead.
+ */
+function seatPosition(index: number, total: number): CSSProperties {
+  const angle = ((-90 + (index + 1) * (360 / total)) * Math.PI) / 180;
   return {
-    left: `${50 + 40 * Math.cos(angle)}%`,
-    top: `${50 + 42 * Math.sin(angle)}%`,
+    left: `${50 + 38 * Math.cos(angle)}%`,
+    top: `${45 - 30 * Math.sin(angle)}%`,
   };
 }
 

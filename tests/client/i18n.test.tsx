@@ -5,7 +5,7 @@ import { afterEach, describe, expect, it } from 'vitest';
 import { integerCategories, translate, type Locale } from '../../src/client/i18n/core.js';
 import { DICTIONARIES, LOCALES } from '../../src/client/i18n/index.js';
 import { sk } from '../../src/client/i18n/sk.js';
-import { renderApp } from './render.js';
+import { openMenu, renderApp } from './render.js';
 
 afterEach(() => {
   cleanup();
@@ -100,7 +100,14 @@ describe('the app in three languages', () => {
   it('switches language without losing the game', async () => {
     const user = userEvent.setup();
     renderApp('sk');
+    await openMenu(user, /^Nastavenia a nová hra/);
     expect(screen.getByRole('button', { name: 'Nová hra' })).toBeTruthy();
+
+    // Two humans, so nothing plays itself while the assertion runs — with a bot
+    // at the table the card count changes on its own and the comparison below
+    // would be measuring the bot, not the language switch.
+    await user.selectOptions(screen.getByLabelText('Miesto 2'), 'human');
+    await user.click(screen.getByRole('button', { name: 'Nová hra' }));
     const cardsBefore = document.querySelectorAll('.seat .hand .card img').length;
 
     await user.selectOptions(screen.getByLabelText('Jazyk'), 'en');

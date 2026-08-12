@@ -52,6 +52,15 @@ const goOnline = async (user: ReturnType<typeof userEvent.setup>) => {
   await screen.findByText('pripojené', {}, { timeout: 5000 });
 };
 
+/**
+ * The room code, which the lobby prints twice — once in the kicker above the
+ * heading and once in the table facts. Either one proves the room exists.
+ */
+const roomCode = async (): Promise<string> => {
+  const found = await screen.findAllByText(/^[0-9A-HJ-NP-TV-Z]{5}$/, {}, { timeout: 5000 });
+  return found[0]!.textContent ?? '';
+};
+
 describe('online room', () => {
   it('connects to the server on demand', async () => {
     const user = userEvent.setup();
@@ -64,11 +73,10 @@ describe('online room', () => {
     await goOnline(user);
 
     await user.click(screen.getByRole('button', { name: 'Vytvoriť izbu' }));
-    const code = await screen.findByText(/^[0-9A-HJ-NP-TV-Z]{5}$/, {}, { timeout: 5000 });
-    expect(code.textContent).toHaveLength(5);
+    expect(await roomCode()).toHaveLength(5);
     expect(screen.getByRole('button', { name: 'Kopírovať odkaz' })).toBeTruthy();
     // Six chairs, the host already sitting in one.
-    expect(screen.getAllByText('voľné')).toHaveLength(5);
+    expect(screen.getAllByText('Voľné miesto')).toHaveLength(5);
   });
 
   it('says so when the code does not exist', async () => {
@@ -85,7 +93,7 @@ describe('online room', () => {
     const user = userEvent.setup();
     await goOnline(user);
     await user.click(screen.getByRole('button', { name: 'Vytvoriť izbu' }));
-    await screen.findByText(/^[0-9A-HJ-NP-TV-Z]{5}$/, {}, { timeout: 5000 });
+    await roomCode();
 
     expect(screen.getByRole('button', { name: 'Začať hru' }).hasAttribute('disabled')).toBe(true);
     expect(screen.getByText(/aspoň dvoch/)).toBeTruthy();
@@ -95,7 +103,7 @@ describe('online room', () => {
     const user = userEvent.setup();
     await goOnline(user);
     await user.click(screen.getByRole('button', { name: 'Vytvoriť izbu' }));
-    await screen.findByText(/^[0-9A-HJ-NP-TV-Z]{5}$/, {}, { timeout: 5000 });
+    await roomCode();
 
     const seats = screen.getAllByRole('listitem');
     await user.click(within(seats[1]!).getAllByRole('button', { name: /^\+ Pokročilý$/ })[0]!);
@@ -120,7 +128,7 @@ describe('online room', () => {
     const user = userEvent.setup();
     await goOnline(user);
     await user.click(screen.getByRole('button', { name: 'Vytvoriť izbu' }));
-    await screen.findByText(/^[0-9A-HJ-NP-TV-Z]{5}$/, {}, { timeout: 5000 });
+    await roomCode();
 
     const seats = screen.getAllByRole('listitem');
     await user.click(within(seats[1]!).getAllByRole('button', { name: /^\+ Začiatočník$/ })[0]!);

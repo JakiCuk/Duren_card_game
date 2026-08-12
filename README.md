@@ -7,15 +7,34 @@ bez účtov — izby sa vytvárajú anonymne a zdieľajú kódom.
 
 ## Vzhľad a nastavenia
 
-Stôl je okrúhly a vždy sa točí tak, aby si sedel dole: tvoje karty pozdĺž spodnej
-hrany a najväčšie zo všetkých, súperi rozostavaní po hornom oblúku, balík pri ľavom
-okraji stola a kôpka v strede. Nad prihadzovanými kartami sú údaje o hre, pod nimi
-tlačidlá. Vpravo je voliteľný prepis.
+Rozhranie vychádza z návrhu **Durak Stôl** z Claude Design. Stôl je oválny a vždy sa
+točí tak, aby si sedel dole: tvoja ruka je rozložená do vejára pozdĺž spodnej hrany
+a pod pointerom sa karty nadvihujú, súperi sedia po obvode ako menovky s avatarom,
+rolou a počtom kariet, balík leží naľavo od kariet v hre a nad nimi sú údaje o hre.
+Pod stolom sú tlačidlá a riadok „kto je na ťahu". Vpravo pláva voliteľný prepis.
 
-Všetko nastavenie je v jednom zloženom paneli **Nastavenia a nová hra**, aby stôl
-dostal celú výšku okna.
+Karty zostali pôvodné — skutočné SVG z balíčka Tek Eye, nie kreslené karty z návrhu.
 
-Pod hlavičkou je zložené **Nastavenia hry** (schované, kým ich nerozbalíš):
+### Tri štýly
+
+V nastaveniach sa prepína **grafický štýl** a **denný/nočný režim**. Celý vzhľad drží
+na custom properties na koreňovom prvku, takže štýl je blok premenných a nie zásah do
+komponentov:
+
+- **Organic** — teplé zemité farby, mäkké tvary, písmo Caprasimo + Figtree.
+- **Modern** — chladná modrá, ostrejšie rohy, Space Grotesk.
+- **Klasik** — zelený filc a bordová, Playfair Display + serif.
+
+Písma sa ťahajú z Google Fonts a je to **jediná požiadavka mimo vlastného originu**;
+každý stack končí systémovým fallbackom, takže stroj bez siete dostane rozumnú stránku.
+
+### Nastavenia
+
+Nastavenia, pravidlá a chat sú **vyskakovacie panely v hlavičke**, nie bloky nad stolom —
+stôl tak dostane celé okno a knoby sa nad ním len na chvíľu otvoria. Tlačidlo
+**Priebeh** prepína prepis.
+
+V paneli **Nastavenia a nová hra** je aj:
 
 - **Pauza botov** — ako dlho bot počká, kým položí kartu. Nula = okamžite.
 - **Počkať na mňa, keď môžem prihodiť** — boti sa zastavia a hra sa spýta, či

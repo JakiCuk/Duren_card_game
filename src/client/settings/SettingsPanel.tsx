@@ -1,5 +1,5 @@
 import { useT } from '../i18n/index.js';
-import { BOT_DELAY_RANGE, type Settings } from './useSettings.js';
+import { BOT_DELAY_RANGE, SKINS, type Settings, type Skin } from './useSettings.js';
 
 export interface SettingsPanelProps {
   settings: Settings;
@@ -7,9 +7,22 @@ export interface SettingsPanelProps {
 }
 
 /**
+ * The swatch trio each skin button shows.
+ *
+ * Deliberately hard-coded rather than read from custom properties: the button
+ * has to preview a skin that is *not* currently applied, so it cannot ask the
+ * cascade what that skin looks like.
+ */
+const SWATCHES: Record<Skin, [string, string, string]> = {
+  organic: ['#c67139', '#7a8a5e', '#f5ead8'],
+  modern: ['#3b6dfb', '#101318', '#f2f4f8'],
+  classic: ['#1f6b45', '#8d1c1c', '#c9a227'],
+};
+
+/**
  * The comfort knobs, rendered as a plain block.
  *
- * No disclosure of its own: it sits inside the one panel the page already has,
+ * No disclosure of its own: it sits inside the one menu the header already has,
  * because two separate fold-outs for "how the game is set up" and "how it
  * behaves" is one more thing to hunt through than anybody needs.
  */
@@ -19,6 +32,54 @@ export function SettingsPanel({ settings, set }: SettingsPanelProps) {
 
   return (
     <section className="settings">
+      <h3>{t('settings.appearance')}</h3>
+
+      <div>
+        <div className="menu__label">{t('settings.skin')}</div>
+        <div className="settings__grid">
+          {SKINS.map((skin) => (
+            <button
+              key={skin}
+              type="button"
+              className={`skinbtn skinbtn--${skin}`}
+              aria-pressed={settings.skin === skin}
+              onClick={() => set('skin', skin)}
+            >
+              <span className="skinbtn__swatch">
+                {SWATCHES[skin].map((colour) => (
+                  <i key={colour} style={{ background: colour }} />
+                ))}
+              </span>
+              <span>{t(`skin.${skin}`)}</span>
+            </button>
+          ))}
+        </div>
+      </div>
+
+      <div className="settings__row">
+        <span>
+          {t('settings.theme')}
+          <span className="seg">
+            <button
+              type="button"
+              className="seg__opt"
+              aria-pressed={settings.theme === 'light'}
+              onClick={() => set('theme', 'light')}
+            >
+              {t('theme.light')}
+            </button>
+            <button
+              type="button"
+              className="seg__opt"
+              aria-pressed={settings.theme === 'dark'}
+              onClick={() => set('theme', 'dark')}
+            >
+              {t('theme.dark')}
+            </button>
+          </span>
+        </span>
+      </div>
+
       <h3>{t('settings.title')}</h3>
 
       <div className="settings__body">

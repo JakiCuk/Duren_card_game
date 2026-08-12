@@ -1,4 +1,5 @@
-import { render } from '@testing-library/react';
+import { render, screen } from '@testing-library/react';
+import type { userEvent } from '@testing-library/user-event';
 import { StrictMode, type ReactElement } from 'react';
 import { App } from '../../src/client/App.js';
 import { I18nProvider, type Locale } from '../../src/client/i18n/index.js';
@@ -32,4 +33,22 @@ export const renderWithI18n = (node: ReactElement, locale: Locale = 'sk') => {
   // Testing Library's own `rerender` replaces the whole tree, provider and all,
   // so anything rendered through it would land outside the context. Re-wrap.
   return { ...result, rerender: (next: ReactElement) => result.rerender(wrap(next)) };
+};
+
+/**
+ * Opens one of the header pop-overs and hands back its panel.
+ *
+ * Settings, rules and chat all live behind a button now — the table gets the
+ * window and the knobs float over it — so a test that wants a control has to
+ * ask for the drawer first, exactly as a player does.
+ */
+export const openMenu = async (
+  user: ReturnType<typeof userEvent.setup>,
+  label: string | RegExp,
+): Promise<HTMLElement> => {
+  const button = screen.getByRole('button', { name: label });
+  if (button.getAttribute('aria-expanded') !== 'true') await user.click(button);
+  const panel = document.querySelector<HTMLElement>('.menu');
+  if (panel === null) throw new Error(`menu ${String(label)} did not open`);
+  return panel;
 };

@@ -4,7 +4,11 @@ import { cleanup, fireEvent, screen, waitFor, within } from '@testing-library/re
 // this package does not carry its type.
 import { userEvent } from '@testing-library/user-event';
 import { afterEach, describe, expect, it } from 'vitest';
-import { renderApp } from './render.js';
+import { openMenu, renderApp } from './render.js';
+
+/** The header buttons that open the two pop-overs the tests need. */
+const SETUP = /^Nastavenia a nová hra/;
+const RULES = /^Pravidlá/;
 
 afterEach(cleanup);
 
@@ -24,8 +28,16 @@ type User = ReturnType<typeof userEvent.setup>;
  */
 async function renderHotSeat(user: User): Promise<void> {
   renderApp();
+  await openMenu(user, SETUP);
   await user.selectOptions(screen.getByLabelText('Miesto 2'), 'human');
   await user.click(screen.getByRole('button', { name: 'Nová hra' }));
+  await closeMenus(user);
+}
+
+/** Dismisses whatever pop-over is open, so the table is clickable again. */
+async function closeMenus(user: User): Promise<void> {
+  const scrim = document.querySelector<HTMLElement>('.menu__scrim');
+  if (scrim) await user.click(scrim);
 }
 
 /**
@@ -143,7 +155,9 @@ describe('hot-seat board', () => {
     await user.click(playableCards()[0]!);
     expect(tableCards().length).toBeGreaterThanOrEqual(1);
 
+    await openMenu(user, SETUP);
     await user.click(screen.getByRole('button', { name: 'Späť' }));
+    await closeMenus(user);
     expect(tableCards()).toHaveLength(0);
     expect(handCards(attacker)).toHaveLength(6);
   });
@@ -152,6 +166,7 @@ describe('hot-seat board', () => {
     const user = userEvent.setup();
     await renderHotSeat(user);
 
+    await openMenu(user, SETUP);
     const seed = screen.getByTitle(/Rovnaký seed/);
     await user.clear(seed);
     await user.type(seed, 'repeatable');
@@ -194,6 +209,7 @@ describe('hot-seat board', () => {
   it('refuses a table the deck cannot supply, and says why', async () => {
     const user = userEvent.setup();
     renderApp();
+    await openMenu(user, SETUP);
 
     await user.selectOptions(screen.getByLabelText('Hráčov'), '6');
     expect(screen.getByText(/nestačí pre 6 hráčov/)).toBeTruthy();
@@ -251,33 +267,47 @@ describe('playing against a bot', () => {
 });
 
 describe('rules panel', () => {
+  const openRules = async (user: User): Promise<HTMLElement> => {
+    await openMenu(user, RULES);
+    return document.querySelector<HTMLElement>('.menu--rules details')!;
+  };
+
   it('applies a preset and says which one is active', async () => {
     const user = userEvent.setup();
     renderApp();
+    const panel = await openRules(user);
 
-    const panel = screen.getByText('Pravidlá').closest('details')!;
     // The name shows up twice by design: as a preset button and as the summary.
     expect(within(panel).getByRole('button', { name: 'Klasický durak' })).toBeTruthy();
     expect(panel.querySelector('.rules__current')?.textContent).toBe('Klasický durak');
 
     await user.click(within(panel).getByRole('button', { name: 'S prehadzovaním' }));
-    expect(panel.querySelector('.rules__current')?.textContent).toBe('S prehadzovaním');
-    expect(within(panel).getByLabelText<HTMLInputElement>(/Prehadzovanie \(perevodnoy\)/).checked).toBe(true);
+    expect(document.querySelector('.rules__current')?.textContent).toBe('S prehadzovaním');
+    expect(
+      screen.getByLabelText<HTMLInputElement>(/Prehadzovanie \(perevodnoy\)/).checked,
+    ).toBe(true);
   });
 
-  it('greys out sub-options of a rule that is switched off', () => {
+  it('greys out sub-options of a rule that is switched off', async () => {
+    const user = userEvent.setup();
     renderApp();
-    const panel = screen.getByText('Pravidlá').closest('details')!;
+    const panel = await openRules(user);
     expect(within(panel).getByLabelText(/Reťazenie prehodení/).hasAttribute('disabled')).toBe(true);
   });
 
   it('warns about a switch that changes the game more than it looks', async () => {
     const user = userEvent.setup();
     renderApp();
+    const panel = await openRules(user);
 
-    const panel = screen.getByText('Pravidlá').closest('details')!;
     await user.click(within(panel).getByLabelText(/Obranca musí zbiť/));
+    // The warning belongs on the page, not inside the drawer that caused it.
     expect(screen.getByText(/berie obrancovi voľbu/)).toBeTruthy();
+    expect(document.querySelector('.menu')!.contains(screen.getByText(/berie obrancovi voľbu/))).toBe(
+      false,
+    );
+
+    await openMenu(user, SETUP);
     // A warning must never block starting a game — only errors do that.
     expect(screen.getByRole('button', { name: 'Nová hra' }).hasAttribute('disabled')).toBe(false);
   });
@@ -286,18 +316,22 @@ describe('rules panel', () => {
     const user = userEvent.setup();
     renderApp();
 
-    const panel = screen.getByText('Pravidlá').closest('details')!;
-    await user.click(within(panel).getByRole('button', { name: 'S prehadzovaním' }));
+    const rules = await openRules(user);
+    await user.click(within(rules).getByRole('button', { name: 'S prehadzovaním' }));
+    await openMenu(user, SETUP);
     await user.selectOptions(screen.getByLabelText('Miesto 2'), 'human');
 
     // Search seeds until one offers a transfer within the first few moves; the
     // point is that the affordance exists and is clickable, not which deal.
-    const seedBox = screen.getByTitle(/Rovnaký seed/);
     let found = false;
     for (let seed = 0; seed < 25 && !found; seed++) {
+      await openMenu(user, SETUP);
+      // Re-queried each pass: closing the drawer unmounts the field.
+      const seedBox = screen.getByTitle(/Rovnaký seed/);
       await user.clear(seedBox);
       await user.type(seedBox, `t${seed}`);
       await user.click(screen.getByRole('button', { name: 'Nová hra' }));
+      await closeMenus(user);
 
       for (let step = 0; step < 6 && !found; step++) {
         const transferBtn = screen.queryByRole('button', { name: /^Prehodiť / });
@@ -318,24 +352,17 @@ describe('rules panel', () => {
 });
 
 describe('game settings', () => {
-  const openSettings = async (user: User): Promise<HTMLElement> => {
-    const panel = document.querySelector<HTMLElement>('details.panel--setup')!;
-    if (!panel.hasAttribute('open')) {
-      await user.click(within(panel).getByText('Nastavenia a nová hra'));
-    }
-    return panel;
-  };
-
   it('stays out of the way until asked for', () => {
     renderApp();
-    // The knobs exist but are folded away; the table gets the attention.
-    expect(document.querySelector('details.panel--setup')!.hasAttribute('open')).toBe(false);
+    // The knobs exist but are folded away; the table gets the whole window.
+    expect(document.querySelector('.menu')).toBeNull();
+    expect(screen.getByRole('button', { name: SETUP })).toBeTruthy();
   });
 
   it('remembers the bot pause between visits', async () => {
     const user = userEvent.setup();
     renderApp();
-    const panel = await openSettings(user);
+    const panel = await openMenu(user, SETUP);
 
     const slider = within(panel).getByLabelText<HTMLInputElement>('Pauza botov');
     expect(Number(slider.value)).toBeGreaterThan(0);
@@ -352,12 +379,30 @@ describe('game settings', () => {
     renderApp();
     expect(document.querySelector('.log')).not.toBeNull();
 
-    const panel = await openSettings(user);
-    await user.click(within(panel).getByLabelText(/Zobraziť prepis hry/));
+    // The transcript has its own header button as well as the checkbox.
+    await user.click(screen.getByRole('button', { name: 'Priebeh' }));
     expect(document.querySelector('.log')).toBeNull();
 
+    const panel = await openMenu(user, SETUP);
     await user.click(within(panel).getByLabelText(/Zobraziť prepis hry/));
     expect(document.querySelector('.log')).not.toBeNull();
+  });
+
+  it('switches skin and theme, and remembers both', async () => {
+    const user = userEvent.setup();
+    renderApp();
+    const panel = await openMenu(user, SETUP);
+
+    await user.click(within(panel).getByRole('button', { name: 'Klasik' }));
+    await user.click(within(panel).getByRole('button', { name: 'Nočný' }));
+
+    const app = document.querySelector('.app')!;
+    expect(app.getAttribute('data-skin')).toBe('classic');
+    expect(app.getAttribute('data-theme')).toBe('dark');
+    expect(JSON.parse(localStorage.getItem('durak.settings')!)).toMatchObject({
+      skin: 'classic',
+      theme: 'dark',
+    });
   });
 
   it('holds the bots while the player still has a card to throw in', async () => {
@@ -388,31 +433,37 @@ describe('game settings', () => {
 });
 
 describe('table layout', () => {
-  it('folds one panel away, not two', () => {
+  it('puts the settings behind one header button, not two panels', async () => {
+    const user = userEvent.setup();
     renderApp();
-    // Setup and preferences share a single disclosure: hunting through two of
-    // them for "the settings" is one fold-out too many.
-    const panels = document.querySelectorAll('details.panel--setup');
-    expect(panels).toHaveLength(1);
-    expect(panels[0]!.hasAttribute('open')).toBe(false);
-    expect(screen.getByText('Nastavenia a nová hra')).toBeTruthy();
-    expect(within(panels[0] as HTMLElement).getByLabelText('Pauza botov')).toBeTruthy();
+    // Setup and preferences share a single drawer: hunting through two of them
+    // for "the settings" is one fold-out too many.
+    const panel = await openMenu(user, SETUP);
+    expect(document.querySelectorAll('.menu')).toHaveLength(1);
+    expect(within(panel).getByLabelText('Pauza botov')).toBeTruthy();
+    expect(within(panel).getByLabelText('Hráčov')).toBeTruthy();
   });
 
-  it('keeps the deck at the table edge and away from every seat', () => {
-    // Regression: the deck sat at the left edge at the same height as the
-    // left-hand player, so at three and four players they overlapped. Seats now
-    // sit along the upper arc and the deck sits below them.
+  it('deals the draw pile beside the cards in play, clear of every chair', () => {
+    // The deck used to sit on the felt's rim, which is where the left-hand
+    // player sits at three and four players. On one centred row with the pile
+    // it cannot collide with a chair at any table size.
     renderApp();
-    const deck = document.querySelector<HTMLElement>('.felt__deck');
+    const pile = document.querySelector('.felt__pile')!;
+    const deck = pile.querySelector('.felt__deck');
+    const table = pile.querySelector('.table');
     expect(deck).not.toBeNull();
-    expect(deck!.closest('.felt__centre')).toBeNull();
+    // To the left of the cards being played, not on top of them.
+    expect(Array.from(pile.children).indexOf(deck!)).toBeLessThan(
+      Array.from(pile.children).indexOf(table!),
+    );
 
+    // Chairs ring the felt; none of them drops into the band the tray owns.
     const tops = Array.from(document.querySelectorAll<HTMLElement>('.seat--across')).map((el) =>
       Number.parseFloat(el.style.top),
     );
     expect(tops.length).toBeGreaterThan(0);
-    for (const top of tops) expect(top).toBeLessThan(60);
+    for (const top of tops) expect(top).toBeLessThan(70);
   });
 
   it('shows the game info on the table, above the cards being played', async () => {
@@ -427,11 +478,10 @@ describe('table layout', () => {
     // Above the pile, not below it.
     const children = Array.from(centre.children);
     expect(children.indexOf(status!)).toBeLessThan(
-      children.indexOf(centre.querySelector('.table')!),
+      children.indexOf(centre.querySelector('.felt__pile')!),
     );
 
-    const panel = document.querySelector<HTMLElement>('details.panel--setup')!;
-    await user.click(within(panel).getByText('Nastavenia a nová hra'));
+    const panel = await openMenu(user, SETUP);
     await user.click(within(panel).getByLabelText(/Zobraziť údaje o hre/));
     expect(document.querySelector('.felt__centre .board__status')).toBeNull();
   });

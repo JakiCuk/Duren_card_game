@@ -1,3 +1,4 @@
+import type { CSSProperties } from 'react';
 import { cardCode, type CardId } from '../../engine/index.js';
 import { useT } from '../i18n/index.js';
 import { defaultTheme, type CardTheme } from './assets.js';
@@ -16,6 +17,8 @@ export interface CardFaceProps {
   /** Dims the card without disabling it — used for "you may not play this now". */
   muted?: boolean;
   title?: string;
+  /** Placement only — the fan angles its cards from the outside. */
+  style?: CSSProperties;
 }
 
 /**
@@ -32,6 +35,7 @@ export function CardFace({
   selected = false,
   muted = false,
   title,
+  style,
 }: CardFaceProps) {
   const t = useT();
   const src = faceDown ? theme.back : theme.card(card);
@@ -58,7 +62,7 @@ export function CardFace({
 
   if (!onClick) {
     return (
-      <span className={className} title={title ?? label}>
+      <span className={className} title={title ?? label} style={style}>
         {image}
       </span>
     );
@@ -68,6 +72,7 @@ export function CardFace({
     <button
       type="button"
       className={className}
+      style={style}
       onClick={() => onClick(card)}
       disabled={disabled}
       title={title ?? label}

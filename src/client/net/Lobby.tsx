@@ -9,19 +9,23 @@ export interface LobbyProps {
   room: RoomState;
   mySeat: number | null;
   playerId: string;
-  chat: ChatLine[];
   onConfig: (config: RuleConfig) => void;
   onSeat: (seat: number) => void;
   onAddBot: (seat: number, level: BotLevel) => void;
   onRemoveBot: (seat: number) => void;
   onStart: () => void;
-  onLeave: () => void;
-  onChat: (text: string) => void;
 }
 
 const shareUrl = (code: string): string =>
   typeof window === 'undefined' ? code : `${window.location.origin}/#/r/${code}`;
 
+/**
+ * The waiting room: who is here, what the table is set to, and the one button
+ * that starts it.
+ *
+ * Chat and leaving live in the header, not here — they belong to the room as a
+ * whole, and duplicating them would give the same action two homes.
+ */
 export function Lobby(props: LobbyProps) {
   const t = useT();
   const { room, mySeat, playerId } = props;
@@ -31,15 +35,18 @@ export function Lobby(props: LobbyProps) {
   const [copied, setCopied] = useState(false);
 
   return (
-    <section className="lobby">
+    <div className="sheet">
       <header className="lobby__head">
         <div>
-          <h2>
-            {t('lobby.room')} <code className="code">{room.code}</code>
-          </h2>
-          <p className="hint">{t('lobby.shareHint')}</p>
+          <div className="kicker">
+            {t('lobby.room')} <span className="code">{room.code}</span>
+          </div>
+          <h1>{t('lobby.waitingTitle')}</h1>
+          <p className="hint">
+            {t('lobby.seatsFilled', { n: occupied, max: room.seats.length })} · {t('lobby.shareHint')}
+          </p>
         </div>
-        <div className="lobby__actions">
+        <div className="panel__row">
           <button
             type="button"
             className="btn"
@@ -51,8 +58,8 @@ export function Lobby(props: LobbyProps) {
           >
             {copied ? t('action.copied') : t('action.copyLink')}
           </button>
-          <button type="button" className="btn" onClick={props.onLeave}>
-            {t('action.leave')}
+          <button type="button" className="btn btn--primary" disabled={!canStart} onClick={props.onStart}>
+            {room.phase === 'finished' ? t('action.rematch') : t('action.start')}
           </button>
         </div>
       </header>
@@ -60,28 +67,24 @@ export function Lobby(props: LobbyProps) {
       <ol className="lobby__seats">
         {room.seats.map((occupant, seat) => (
           <li key={seat} className={`lobby__seat lobby__seat--${occupant.kind}`}>
-            <span className="lobby__seatNo">{seat + 1}.</span>
+            <span className="avatar">{occupant.kind === 'empty' ? '+' : initials(occupant.name)}</span>
 
-            {occupant.kind === 'human' ? (
-              <span className="lobby__who">
-                {occupant.name}
-                {occupant.playerId === room.hostId ? ` · ${t('lobby.host')}` : ''}
-                {seat === mySeat ? ` · ${t('lobby.you')}` : ''}
-                {occupant.connected ? '' : ` · ${t('role.away')}`}
-                {occupant.substituted ? ` · ${t('role.substituted')}` : ''}
+            <span className="lobby__who">
+              <span className="lobby__name">
+                {occupant.kind === 'empty' ? t('lobby.free') : occupant.name}
               </span>
-            ) : occupant.kind === 'bot' ? (
-              <span className="lobby__who">
-                {occupant.name} ·{' '}
-                {t(BOT_CATALOGUE.find((b) => b.level === occupant.level)?.nameKey ?? '')}
-              </span>
+              <span className="lobby__meta">{describeSeat(occupant, seat, room, mySeat, t)}</span>
+            </span>
+
+            {occupant.kind === 'empty' ? (
+              <span className="tag tag--outline">{t('lobby.invite')}</span>
             ) : (
-              <span className="lobby__who lobby__who--empty">{t('lobby.free')}</span>
+              <span className="tag tag--accent">{t('lobby.seated')}</span>
             )}
 
             <span className="lobby__seatActions">
               {occupant.kind === 'empty' && mySeat !== seat ? (
-                <button type="button" className="btn btn--ghost" onClick={() => props.onSeat(seat)}>
+                <button type="button" className="btn" onClick={() => props.onSeat(seat)}>
                   {t('action.sitHere')}
                 </button>
               ) : null}
@@ -90,7 +93,7 @@ export function Lobby(props: LobbyProps) {
                     <button
                       key={bot.level}
                       type="button"
-                      className="btn btn--ghost"
+                      className="btn"
                       title={t(bot.blurbKey)}
                       onClick={() => props.onAddBot(seat, bot.level)}
                     >
@@ -99,7 +102,7 @@ export function Lobby(props: LobbyProps) {
                   ))
                 : null}
               {occupant.kind === 'bot' && isHost ? (
-                <button type="button" className="btn btn--ghost" onClick={() => props.onRemoveBot(seat)}>
+                <button type="button" className="btn" onClick={() => props.onRemoveBot(seat)}>
                   {t('action.removeBot')}
                 </button>
               ) : null}
@@ -108,32 +111,53 @@ export function Lobby(props: LobbyProps) {
         ))}
       </ol>
 
-      {isHost ? (
-        <RulesPanel config={room.config} onChange={props.onConfig} />
-      ) : (
-        <p className="hint">{t('lobby.rulesByHost')}</p>
-      )}
+      <div className="lobby__cols">
+        <div className="panel">
+          <div className="kicker">{t('rules.title')}</div>
+          {isHost ? (
+            <RulesPanel config={room.config} onChange={props.onConfig} />
+          ) : (
+            <p className="hint">{t('lobby.rulesByHost')}</p>
+          )}
 
-      {room.problems.errors.length > 0 ? (
-        <p className="problem problem--error">
-          {room.problems.errors.map((c) => explainRoom(c, t)).join(' ')}
-        </p>
-      ) : null}
-      {room.problems.warnings.length > 0 ? (
-        <p className="problem problem--warn">
-          {room.problems.warnings.map((c) => explainRoom(c, t)).join(' ')}
-        </p>
-      ) : null}
+          {room.problems.errors.length > 0 ? (
+            <p className="problem problem--error">
+              {room.problems.errors.map((c) => explainRoom(c, t)).join(' ')}
+            </p>
+          ) : null}
+          {room.problems.warnings.length > 0 ? (
+            <p className="problem problem--warn">
+              {room.problems.warnings.map((c) => explainRoom(c, t)).join(' ')}
+            </p>
+          ) : null}
+          {isHost ? null : <p className="hint">{t('lobby.startByHost')}</p>}
+        </div>
 
-      <div className="panel__row">
-        <button type="button" className="btn btn--primary" disabled={!canStart} onClick={props.onStart}>
-          {room.phase === 'finished' ? t('action.rematch') : t('action.start')}
-        </button>
-        {!isHost ? <span className="hint">{t('lobby.startByHost')}</span> : null}
+        <div className="panel">
+          <div className="kicker">{t('lobby.facts')}</div>
+          <div className="lobby__facts">
+            <div className="lobby__fact">
+              <span>{t('field.deck')}</span>
+              <b>{t(`deck.${room.config.deckSize}`)}</b>
+            </div>
+            <div className="lobby__fact">
+              <span>{t('lobby.fact.seats')}</span>
+              <b>
+                {occupied} / {room.seats.length}
+              </b>
+            </div>
+            <div className="lobby__fact">
+              <span>{t('rules.transfer')}</span>
+              <b>{room.config.transfer.enabled ? t('yes') : t('no')}</b>
+            </div>
+            <div className="lobby__fact">
+              <span>{t('lobby.fact.code')}</span>
+              <b className="code">{room.code}</b>
+            </div>
+          </div>
+        </div>
       </div>
-
-      <Chat lines={props.chat} onSend={props.onChat} />
-    </section>
+    </div>
   );
 }
 
@@ -172,6 +196,32 @@ export function Chat({ lines, onSend }: { lines: ChatLine[]; onSend: (text: stri
       </form>
     </div>
   );
+}
+
+/** The small grey line under a name: role, level, and whether they are here. */
+function describeSeat(
+  occupant: RoomState['seats'][number],
+  seat: number,
+  room: RoomState,
+  mySeat: number | null,
+  t: Translate,
+): string {
+  if (occupant.kind === 'empty') return t('lobby.freeHint');
+  if (occupant.kind === 'bot') {
+    return t(BOT_CATALOGUE.find((b) => b.level === occupant.level)?.nameKey ?? 'role.bot');
+  }
+  const parts: string[] = [];
+  if (occupant.playerId === room.hostId) parts.push(t('lobby.host'));
+  if (seat === mySeat) parts.push(t('lobby.you'));
+  if (!occupant.connected) parts.push(t('role.away'));
+  if (occupant.substituted) parts.push(t('role.substituted'));
+  return parts.join(' · ') || t('lobby.player');
+}
+
+function initials(name: string): string {
+  const words = name.trim().split(/\s+/).filter(Boolean);
+  if (words.length >= 2) return (words[0]![0]! + words[1]![0]!).toUpperCase();
+  return (words[0] ?? '?').slice(0, 2).toUpperCase();
 }
 
 /** Room problems arrive as codes; the dictionary turns them into sentences. */
