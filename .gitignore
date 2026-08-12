@@ -8,3 +8,8 @@ dist/
 !.env.example
 coverage/
 public/cards/custom/
+
+# Working notes for the coding agent, and screenshots dropped in the root while
+# reviewing the table. Neither is part of the project.
+.claude/
+/*.png
