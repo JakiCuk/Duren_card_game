@@ -13,7 +13,18 @@ a pod pointerom sa karty nadvihujú, súperi sedia po obvode ako menovky s avata
 rolou a počtom kariet, balík leží naľavo od kariet v hre a nad nimi sú údaje o hre.
 Pod stolom sú tlačidlá a riadok „kto je na ťahu". Vpravo pláva voliteľný prepis.
 
-Karty zostali pôvodné — skutočné SVG z balíčka Tek Eye, nie kreslené karty z návrhu.
+### Karty
+
+Dva balíčky, prepínajú sa v nastaveniach:
+
+- **Klasické** — skutočné SVG z balíčka Tek Eye (public domain).
+- **Minimal** — kreslené, generuje ich `tools/make-minimal-deck.ts`: index v rohu a jeden
+  veľký znak farby. Hodnoty sú rovnaké ako v klasickom balíčku (J, Q, K, A), aby oba
+  balíčky pomenovali tú istú kartu rovnako.
+
+Karty sa animujú: prilietavajú zo stoličky hráča, ktorý ich zahral, a po kole odlietavajú
+buď k obrancovi (keď bral), alebo na odhadzovaciu kôpku. Pri `prefers-reduced-motion` sa
+animácie nespúšťajú.
 
 ### Tri štýly
 
@@ -35,6 +46,12 @@ stôl tak dostane celé okno a knoby sa nad ním len na chvíľu otvoria. Tlači
 **Priebeh** prepína prepis.
 
 V paneli **Nastavenia a nová hra** je aj:
+
+- **Balíček kariet** — klasické alebo minimal.
+- **Zoradiť karty** — podľa farby (skupiny farieb, tromfy nakoniec) alebo podľa sily
+  (jeden rad od najslabšej po najsilnejšiu).
+- **Nápoveda ťahu** — stmaví karty, ktoré teraz nemôžeš zahrať. Vypnuté vyzerá ruka
+  rovnako a musíš si to ustrážiť sám.
 
 - **Pauza botov** — ako dlho bot počká, kým položí kartu. Nula = okamžite.
 - **Počkať na mňa, keď môžem prihodiť** — boti sa zastavia a hra sa spýta, či

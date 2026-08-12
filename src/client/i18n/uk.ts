@@ -256,4 +256,14 @@ export const uk: Dictionary = {
   'lobby.fact.code': 'Код кімнати',
   'yes': 'так',
   'no': 'ні',
+
+  // --- decks, sorting, hints ---
+  'settings.cardTheme': 'Колода карт',
+  'cards.classic': 'Класична',
+  'cards.minimal': 'Мінімал',
+  'settings.sortBy': 'Сортувати карти',
+  'sort.suit': 'За мастю',
+  'sort.power': 'За силою',
+  'settings.hints': 'Підказка ходу',
+  'settings.hints.hint': 'Затемнює карти, якими зараз не можна ходити. Вимкнено — рука виглядає однаково і стежиш сам.',
 };

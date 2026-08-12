@@ -11,8 +11,8 @@ export type ThemeId = string;
 
 export interface CardTheme {
   id: ThemeId;
-  /** Human-readable name; becomes a translation key once i18n lands. */
-  name: string;
+  /** Translation key for the picker; the deck itself carries no prose. */
+  nameKey: string;
   /** width / height, used to reserve layout space before the image loads. */
   aspect: number;
   back: string;
@@ -42,14 +42,14 @@ function collect(themeId: ThemeId): Record<string, string> {
   return out;
 }
 
-function buildTheme(id: ThemeId, name: string, aspect: number): CardTheme {
+function buildTheme(id: ThemeId, aspect: number): CardTheme {
   const assets = collect(id);
   const back = assets['back'];
   if (back === undefined) throw new Error(`Card theme "${id}" has no back.svg`);
 
   return {
     id,
-    name,
+    nameKey: `cards.${id}`,
     aspect,
     back,
     card(c: CardId): string {
@@ -60,7 +60,12 @@ function buildTheme(id: ThemeId, name: string, aspect: number): CardTheme {
   };
 }
 
-const THEMES: CardTheme[] = [buildTheme('classic', 'Klasické', 234 / 333)];
+/**
+ * Both decks share a box, so switching one for the other never nudges the
+ * layout by a pixel. `classic` is the photographic Tek Eye deck; `minimal` is
+ * drawn by `tools/make-minimal-deck.ts`.
+ */
+const THEMES: CardTheme[] = [buildTheme('classic', 234 / 333), buildTheme('minimal', 234 / 333)];
 
 export const listThemes = (): CardTheme[] => [...THEMES];
 

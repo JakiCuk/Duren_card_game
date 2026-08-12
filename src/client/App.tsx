@@ -214,6 +214,8 @@ function LocalGame({ mode, setMode, settings, set }: ModeProps) {
           play={game.play}
           awaitingThrowIn={settings.holdForThrowIn && game.pendingThrowIn !== null}
           showStatus={settings.showStatus}
+          sortBy={settings.sortBy}
+          hints={settings.hints}
         />
         {settings.showLog ? <Log lines={log} /> : null}
       </div>
@@ -339,6 +341,8 @@ function OnlineGame({ mode, setMode, settings, set }: ModeProps) {
           <Board
             model={model}
             showStatus={settings.showStatus}
+            sortBy={settings.sortBy}
+            hints={settings.hints}
             play={(move) => {
               if (net.view) net.move(net.view.seq, move);
             }}

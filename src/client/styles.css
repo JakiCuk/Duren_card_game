@@ -750,13 +750,6 @@ body {
   width: min(62vw, 860px);
 }
 
-.board__status {
-  display: flex;
-  flex-wrap: wrap;
-  justify-content: center;
-  gap: var(--space-2);
-}
-
 .chip {
   display: inline-flex;
   align-items: center;
@@ -810,6 +803,7 @@ body {
 }
 
 .table {
+  position: relative;
   display: flex;
   flex-wrap: wrap;
   align-items: center;
@@ -842,6 +836,67 @@ body {
   left: 1.1rem;
   top: 1.7rem;
   rotate: 9deg;
+}
+
+.pair .card,
+.pair__defence {
+  animation: cardIn 0.34s cubic-bezier(0.22, 0.61, 0.36, 1) both;
+}
+
+/* Cards arrive from the chair that played them and leave towards wherever the
+   bout went, so the table never simply blinks and changes. */
+@keyframes cardIn {
+  from {
+    transform: translate(var(--fx, 0), var(--fy, 0)) scale(0.86);
+    opacity: 0;
+  }
+
+  to {
+    transform: none;
+    opacity: 1;
+  }
+}
+
+.flight {
+  position: absolute;
+  left: 0;
+  top: 0;
+  display: flex;
+  gap: var(--space-4);
+  pointer-events: none;
+  z-index: 4;
+}
+
+.flight__card {
+  animation: cardOut 0.52s ease-in both;
+}
+
+.flight__card:nth-child(even) {
+  animation-delay: 0.04s;
+}
+
+@keyframes cardOut {
+  from {
+    transform: none;
+    opacity: 1;
+  }
+
+  to {
+    transform: translate(var(--tx, 0), var(--ty, 0)) scale(0.7) rotate(6deg);
+    opacity: 0;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .pair .card,
+  .pair__defence,
+  .flight__card {
+    animation: none;
+  }
+
+  .flight {
+    display: none;
+  }
 }
 
 .pair--target::after {
@@ -1000,13 +1055,6 @@ body {
   color: var(--color-bg);
 }
 
-.turn {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  min-height: 2.4rem;
-}
-
 .turn__avatar {
   display: flex;
   align-items: center;
@@ -1021,10 +1069,6 @@ body {
   font-size: 13px;
 }
 
-.turn--mine .turn__avatar {
-  animation: turnPulse 1.8s ease-in-out infinite;
-}
-
 @keyframes turnPulse {
   0%,
   100% {
@@ -1037,7 +1081,7 @@ body {
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .turn--mine .turn__avatar {
+  .seat--me.seat--turn .turn__avatar {
     animation: none;
     box-shadow: 0 0 0 3px color-mix(in srgb, var(--color-accent) 55%, transparent);
   }
@@ -1047,6 +1091,11 @@ body {
   margin: 0;
   font-size: 13px;
   font-weight: 600;
+}
+
+/* The deck preview in the settings picker is a card, not a swatch. */
+.skinbtn .card__img {
+  width: 2.8rem;
 }
 
 .felt__prompt--wait {
@@ -1062,9 +1111,16 @@ body {
 }
 
 .seat--me .seat__head {
-  background: none;
-  box-shadow: none;
-  padding: 0;
+  background: var(--color-surface);
+  box-shadow: var(--shadow-sm);
+}
+
+.seat--me.seat--turn .seat__head {
+  outline: 3px solid var(--color-accent);
+}
+
+.seat--me.seat--turn .turn__avatar {
+  animation: turnPulse 1.8s ease-in-out infinite;
 }
 
 .seat--me .hand {

@@ -379,13 +379,65 @@ describe('game settings', () => {
     renderApp();
     expect(document.querySelector('.log')).not.toBeNull();
 
-    // The transcript has its own header button as well as the checkbox.
-    await user.click(screen.getByRole('button', { name: 'Priebeh' }));
-    expect(document.querySelector('.log')).toBeNull();
+    // One switch, not two: a header button doing the same job as this checkbox
+    // is a second place to look for the same setting.
+    expect(screen.queryByRole('button', { name: 'Priebeh' })).toBeNull();
 
     const panel = await openMenu(user, SETUP);
     await user.click(within(panel).getByLabelText(/Zobraziť prepis hry/));
+    expect(document.querySelector('.log')).toBeNull();
+
+    await user.click(within(panel).getByLabelText(/Zobraziť prepis hry/));
     expect(document.querySelector('.log')).not.toBeNull();
+  });
+
+  it('sorts the hand by suit or by strength, on request', async () => {
+    const user = userEvent.setup();
+    renderApp();
+    const codes = () =>
+      Array.from(document.querySelectorAll('.seat--me .hand .card img')).map((img) =>
+        img.getAttribute('alt'),
+      );
+    const bySuit = codes();
+
+    const panel = await openMenu(user, SETUP);
+    await user.click(within(panel).getByRole('button', { name: 'Podľa sily' }));
+    const byPower = codes();
+
+    expect(byPower).toHaveLength(bySuit.length);
+    expect([...byPower].sort()).toEqual([...bySuit].sort());
+    expect(JSON.parse(localStorage.getItem('durak.settings')!)).toMatchObject({ sortBy: 'power' });
+  });
+
+  it('stops shading the unplayable cards when hints are off', async () => {
+    const user = userEvent.setup();
+    renderApp();
+    const muted = () => document.querySelectorAll('.seat--me .hand .card--muted').length;
+
+    const panel = await openMenu(user, SETUP);
+    await user.click(within(panel).getByLabelText(/Nápoveda ťahu/));
+    expect(muted()).toBe(0);
+
+    await user.click(within(panel).getByLabelText(/Nápoveda ťahu/));
+    expect(JSON.parse(localStorage.getItem('durak.settings')!)).toMatchObject({ hints: true });
+  });
+
+  it('offers a second deck and draws the table with it', async () => {
+    const user = userEvent.setup();
+    renderApp();
+    const srcOf = () =>
+      document.querySelector('.seat--me .hand .card img')!.getAttribute('src');
+    const before = srcOf();
+
+    const panel = await openMenu(user, SETUP);
+    await user.click(within(panel).getByRole('button', { name: 'Minimal' }));
+    expect(srcOf()).not.toBe(before);
+    // The cards are still named the same: a Q is a Q in either deck.
+    expect(
+      Array.from(document.querySelectorAll('.seat--me .hand .card img')).every((img) =>
+        /^[2-9TJQKA][CDHS]$/.test(img.getAttribute('alt') ?? ''),
+      ),
+    ).toBe(true);
   });
 
   it('switches skin and theme, and remembers both', async () => {
@@ -466,24 +518,31 @@ describe('table layout', () => {
     for (const top of tops) expect(top).toBeLessThan(70);
   });
 
-  it('shows the game info on the table, above the cards being played', async () => {
+  it('keeps the trump beside your name and off the table', async () => {
     const user = userEvent.setup();
     renderApp();
 
-    const centre = document.querySelector('.felt__centre')!;
-    const status = centre.querySelector('.board__status');
-    expect(status, 'the info row belongs on the table').not.toBeNull();
+    // The felt used to repeat the deck and discard counts that the pile itself
+    // already shows. Only the trump is left, and it sits with your name.
+    expect(document.querySelector('.felt__centre .board__status')).toBeNull();
+    const status = document.querySelector('.seat--me .board__status');
+    expect(status, 'the trump belongs beside your name').not.toBeNull();
     expect(status!.textContent).toContain('Tromf');
-
-    // Above the pile, not below it.
-    const children = Array.from(centre.children);
-    expect(children.indexOf(status!)).toBeLessThan(
-      children.indexOf(centre.querySelector('.felt__pile')!),
-    );
 
     const panel = await openMenu(user, SETUP);
     await user.click(within(panel).getByLabelText(/Zobraziť údaje o hre/));
-    expect(document.querySelector('.felt__centre .board__status')).toBeNull();
+    expect(document.querySelector('.board__status')).toBeNull();
+  });
+
+  it('says who you are and what you are doing exactly once', async () => {
+    const user = userEvent.setup();
+    await renderHotSeat(user);
+    const mine = document.querySelector('.seat--me')!;
+    // Name, role and card count used to be printed twice — once on the chair
+    // and once on a separate turn indicator saying the same thing.
+    expect(mine.querySelectorAll('.seat__name')).toHaveLength(1);
+    expect(mine.querySelectorAll('.seat__roles')).toHaveLength(1);
+    expect(mine.querySelectorAll('.seat__count')).toHaveLength(1);
   });
 
   it('gives your own hand the biggest cards on the table', () => {

@@ -112,6 +112,15 @@ export class Room {
   private awaySince = new Map<Seat, number>();
   /** Seats a stand-in has actually taken over, as opposed to merely away. */
   private standInActive = new Set<Seat>();
+  /**
+   * Seats whose player walked out mid-game.
+   *
+   * Different from `awaySince`: an away player is expected back and their chair
+   * waits for them. Somebody who pressed Leave is not coming back, but their
+   * cards are still in the deal — a stand-in has to finish the hand or the bout
+   * waits forever for a chair nobody is sitting in.
+   */
+  private abandoned = new Set<Seat>();
   /** Bumped whenever the seat list changes in a way clients should see. */
   private seatsVersion = 0;
   /** The step a turn was scheduled for; a newer step means the timer is stale. */
@@ -133,6 +142,17 @@ export class Room {
   get phase(): RoomState['phase'] {
     if (this.state === null) return 'lobby';
     return this.state.phase === 'finished' ? 'finished' : 'playing';
+  }
+
+  /**
+   * Guards the lobby actions: seats, bots, rules, joining.
+   *
+   * `finished` is a lobby with a scoreboard, not a locked room. Treating it as
+   * "in progress" is what made the seat controls dead after every game — the
+   * client draws the waiting room again but every button came back refused.
+   */
+  private requireBetweenGames(): void {
+    if (this.phase === 'playing') throw new RoomError('room_in_progress');
   }
 
   /** Seats in play, i.e. the prefix of occupied seats used to deal a game. */
@@ -166,7 +186,7 @@ export class Room {
       this.setConnected(player.id, true);
       return existing;
     }
-    if (this.phase !== 'lobby') throw new RoomError('room_in_progress');
+    this.requireBetweenGames();
     const free = this.seats.findIndex((s) => s.kind === 'empty');
     if (free === -1) throw new RoomError('room_full');
     this.seats[free] = {
@@ -179,17 +199,23 @@ export class Room {
     return free;
   }
 
+  /**
+   * Gives up a chair for good.
+   *
+   * Leaving is a decision, not an accident: the seat is released either way, so
+   * the room can be closed once the last person walks out. A dropped socket is
+   * a different thing entirely and goes through `setConnected` instead, which
+   * keeps the chair warm for a reconnect.
+   */
   leave(playerId: string): void {
     this.touch();
     const seat = this.seatOf(playerId);
     if (seat === null) return;
-    if (this.phase === 'lobby') {
-      this.seats[seat] = emptySeat();
-    } else {
-      // Mid-game the seat is kept so the player can come back to it.
-      this.setConnected(playerId, false);
-    }
+    this.seats[seat] = emptySeat();
+    this.awaySince.delete(seat);
+    if (this.phase === 'playing') this.abandoned.add(seat);
     this.promoteHostIfNeeded();
+    this.scheduleAutoTurn();
   }
 
   setConnected(playerId: string, connected: boolean): void {
@@ -244,13 +270,13 @@ export class Room {
 
   setConfig(playerId: string, config: RuleConfig): void {
     this.requireHost(playerId);
-    if (this.phase !== 'lobby') throw new RoomError('room_in_progress');
+    this.requireBetweenGames();
     this.config = config;
     this.touch();
   }
 
   takeSeat(playerId: string, seat: Seat): void {
-    if (this.phase !== 'lobby') throw new RoomError('room_in_progress');
+    this.requireBetweenGames();
     if (seat < 0 || seat >= MAX_PLAYERS) throw new RoomError('seat_out_of_range');
     const target = this.seats[seat]!;
     if (target.kind !== 'empty') throw new RoomError('seat_taken');
@@ -263,7 +289,7 @@ export class Room {
 
   addBot(playerId: string, seat: Seat, level: BotLevel): void {
     this.requireHost(playerId);
-    if (this.phase !== 'lobby') throw new RoomError('room_in_progress');
+    this.requireBetweenGames();
     if (seat < 0 || seat >= MAX_PLAYERS) throw new RoomError('seat_out_of_range');
     if (!isBotLevel(level)) throw new RoomError('bot_level_unavailable');
     if (level > MAX_BOT_LEVEL) throw new RoomError('bot_level_unavailable', `level ${level} is not built yet`);
@@ -274,7 +300,7 @@ export class Room {
 
   removeBot(playerId: string, seat: Seat): void {
     this.requireHost(playerId);
-    if (this.phase !== 'lobby') throw new RoomError('room_in_progress');
+    this.requireBetweenGames();
     if (this.seats[seat]?.kind !== 'bot') throw new RoomError('seat_out_of_range');
     this.seats[seat] = emptySeat();
     this.touch();
@@ -305,6 +331,9 @@ export class Room {
     });
     this.state = state;
     this.bots = new Map();
+    this.abandoned.clear();
+    this.standIns.clear();
+    this.standInActive.clear();
     this.seats.forEach((occupant, seat) => {
       if (occupant.kind === 'bot') {
         this.bots.set(seat, createBot(occupant.level, seat, `${this.code}:${seat}:${state.step}`));
@@ -384,6 +413,12 @@ export class Room {
       return;
     }
 
+    const goneSeat = actors.find((s) => this.abandoned.has(s));
+    if (goneSeat !== undefined) {
+      this.arm(step, goneSeat, this.standInFor(goneSeat), (this.deps.thinkingMs ?? defaultThinkingMs)(SUBSTITUTE_LEVEL));
+      return;
+    }
+
     const awaySeat = actors.find((s) => this.awaySince.has(s));
     if (awaySeat !== undefined) {
       const since = this.awaySince.get(awaySeat)!;
@@ -421,7 +456,7 @@ export class Room {
         this.scheduleAutoTurn();
         return;
       }
-      if (!this.bots.has(seat)) {
+      if (!this.bots.has(seat) && !this.abandoned.has(seat)) {
         const away = this.awaySince.has(seat);
         // Somebody who came back within grace keeps their turn, and a present
         // player only loses it once the turn clock has actually run out.

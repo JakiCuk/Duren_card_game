@@ -1,5 +1,8 @@
+import { listThemes } from '../cards/assets.js';
+import { CardFace } from '../cards/CardFace.js';
+import { parseCardCode } from '../../engine/index.js';
 import { useT } from '../i18n/index.js';
-import { BOT_DELAY_RANGE, SKINS, type Settings, type Skin } from './useSettings.js';
+import { BOT_DELAY_RANGE, SKINS, SORTS, type Settings, type Skin } from './useSettings.js';
 
 export interface SettingsPanelProps {
   settings: Settings;
@@ -56,6 +59,29 @@ export function SettingsPanel({ settings, set }: SettingsPanelProps) {
         </div>
       </div>
 
+      <div>
+        <div className="menu__label">{t('settings.cardTheme')}</div>
+        <div className="settings__grid">
+          {listThemes().map((deck) => (
+            <button
+              key={deck.id}
+              type="button"
+              className="skinbtn"
+              // The preview card carries its own alt text, which would
+              // otherwise end up in this button's name as "QS Minimal".
+              aria-label={t(deck.nameKey)}
+              aria-pressed={settings.cardTheme === deck.id}
+              onClick={() => set('cardTheme', deck.id)}
+            >
+              {/* The preview is the deck itself, not a swatch: there is nothing
+                  to summarise about a card that the card does not say better. */}
+              <CardFace card={parseCardCode('QS')} size="sm" theme={deck} />
+              <span>{t(deck.nameKey)}</span>
+            </button>
+          ))}
+        </div>
+      </div>
+
       <div className="settings__row">
         <span>
           {t('settings.theme')}
@@ -83,6 +109,37 @@ export function SettingsPanel({ settings, set }: SettingsPanelProps) {
       <h3>{t('settings.title')}</h3>
 
       <div className="settings__body">
+        <div className="settings__row">
+          <span>
+            {t('settings.sortBy')}
+            <span className="seg">
+              {SORTS.map((sort) => (
+                <button
+                  key={sort}
+                  type="button"
+                  className="seg__opt"
+                  aria-pressed={settings.sortBy === sort}
+                  onClick={() => set('sortBy', sort)}
+                >
+                  {t(`sort.${sort}`)}
+                </button>
+              ))}
+            </span>
+          </span>
+        </div>
+
+        <label className="toggle">
+          <input
+            type="checkbox"
+            checked={settings.hints}
+            onChange={(e) => set('hints', e.target.checked)}
+          />
+          <span>
+            {t('settings.hints')}
+            <small>{t('settings.hints.hint')}</small>
+          </span>
+        </label>
+
         <label className="settings__row">
           <span>
             {t('settings.botSpeed')}

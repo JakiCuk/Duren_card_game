@@ -1,19 +1,35 @@
-import { useEffect, useMemo, useState, type CSSProperties } from 'react';
-import { cardCode, rankOf, suitOf, type CardId, type Move, type Seat } from '../../engine/index.js';
+import { useEffect, useMemo, useRef, useState, type CSSProperties } from 'react';
+import {
+  cardCode,
+  rankOf,
+  suitOf,
+  type CardId,
+  type Move,
+  type Seat,
+  type TableSlot,
+} from '../../engine/index.js';
 import { CardBackStack, CardFace } from '../cards/CardFace.js';
 import { useT, type Translate } from '../i18n/index.js';
+import type { SortBy } from '../settings/useSettings.js';
 import type { BoardModel, BoardSeat } from './model.js';
 
 const SUIT_GLYPH = ['♣', '♦', '♥', '♠'] as const;
 const SUIT_KEY = ['suit.clubs', 'suit.diamonds', 'suit.hearts', 'suit.spades'] as const;
+
+/** How long a bout stays on screen flying away after it is over. */
+const FLIGHT_MS = 520;
 
 export interface BoardProps {
   model: BoardModel;
   play: (move: Move) => void;
   /** True while this player could still add a card, so the table can say so. */
   awaitingThrowIn?: boolean;
-  /** Trump, bout and pile counts, shown just above the cards in play. */
+  /** Show the trump beside your name. */
   showStatus?: boolean;
+  /** Suits grouped, or one run from weakest to strongest. */
+  sortBy?: SortBy;
+  /** Dim the cards you may not play. Off, the hand is drawn plain. */
+  hints?: boolean;
 }
 
 /**
@@ -25,7 +41,14 @@ export interface BoardProps {
  * underneath. Whoever you are playing rotates to the bottom, so the layout
  * never asks you to work out which of six chairs is yours.
  */
-export function Board({ model, play, awaitingThrowIn = false, showStatus = true }: BoardProps) {
+export function Board({
+  model,
+  play,
+  awaitingThrowIn = false,
+  showStatus = true,
+  sortBy = 'suit',
+  hints = true,
+}: BoardProps) {
   const t = useT();
   const [seat, setSeat] = useState<Seat>(model.mySeat ?? model.controllable[0] ?? 0);
   const [slot, setSlot] = useState(0);
@@ -75,34 +98,28 @@ export function Board({ model, play, awaitingThrowIn = false, showStatus = true 
   const seatName = (s: Seat): string =>
     model.seats.find((x) => x.seat === s)?.name ?? t('player.seat', { n: s + 1 });
 
+  const chairs = useMemo(() => {
+    const map = new Map<Seat, CSSProperties>();
+    others.forEach((p, i) => map.set(p.seat, seatPosition(i, others.length + 1)));
+    return map;
+  }, [model.seats, meIndex]);
+
+  const flight = useFlight(model);
+  const prompt = awaitingThrowIn
+    ? t('board.yourThrowIn')
+    : model.controllable.length === 0 && !model.finished
+      ? t('board.waiting')
+      : null;
+
   return (
     <div className="board">
       <div className="felt" />
 
-      {others.map((p, i) => (
-        <Opponent
-          key={p.seat}
-          player={p}
-          model={model}
-          style={seatPosition(i, others.length + 1)}
-        />
+      {others.map((p) => (
+        <Opponent key={p.seat} player={p} model={model} style={chairs.get(p.seat)!} />
       ))}
 
       <div className="felt__centre">
-        {showStatus ? (
-          <div className="board__status">
-            <span className="chip" title={t('board.trumpIs', { suit: t(SUIT_KEY[model.trump]) })}>
-              {t('board.trump')}{' '}
-              <strong className={model.trump === 1 || model.trump === 2 ? 'red' : ''}>
-                {SUIT_GLYPH[model.trump]}
-              </strong>
-            </span>
-            <span className="chip">{t('board.bout', { n: model.boutIndex + 1 })}</span>
-            <span className="chip">{t('board.deck', { n: model.deckCount })}</span>
-            <span className="chip">{t('board.discard', { n: model.discardCount })}</span>
-          </div>
-        ) : null}
-
         <div className="felt__pile">
           <div className="felt__deck">
             {model.deckCount > 0 ? (
@@ -138,22 +155,37 @@ export function Board({ model, play, awaitingThrowIn = false, showStatus = true 
                   <CardFace
                     card={pair.attack}
                     size="md"
+                    style={originOf(model.attackerSeat, chairs)}
                     {...(pair.defence === null && isDefender ? { onClick: () => setSlot(i) } : {})}
                     title={pair.defence === null ? t('board.unbeatenHint') : cardCode(pair.attack)}
                   />
                   {pair.defence !== null ? (
-                    <span className="pair__defence">
+                    <span className="pair__defence" style={originOf(model.defenderSeat, chairs)}>
                       <CardFace card={pair.defence} size="md" />
                     </span>
                   ) : null}
                 </div>
               ))
             )}
+
+            {flight === null ? null : (
+              <div className="flight" aria-hidden="true" style={flight.target}>
+                {flight.cards.map((card, i) => (
+                  <span key={`${card}-${i}`} className="flight__card">
+                    <CardFace card={card} size="md" />
+                  </span>
+                ))}
+              </div>
+            )}
           </div>
         </div>
       </div>
 
       <div className="tray">
+        {prompt === null ? null : (
+          <p className={`felt__prompt${awaitingThrowIn ? ' felt__prompt--wait' : ''}`}>{prompt}</p>
+        )}
+
         <div className="actions">
           {takeMove ? (
             <button type="button" className="btn btn--warn" onClick={() => play(takeMove)}>
@@ -191,48 +223,70 @@ export function Board({ model, play, awaitingThrowIn = false, showStatus = true 
             ))}
         </div>
 
-        <Turn player={me} model={model} awaitingThrowIn={awaitingThrowIn} />
-
-        <Me player={me} model={model} playable={playableCards} play={play} />
+        <Me
+          player={me}
+          model={model}
+          playable={playableCards}
+          play={play}
+          sortBy={sortBy}
+          hints={hints}
+          showStatus={showStatus}
+        />
       </div>
     </div>
   );
 }
 
-/** The one line that says whose move it is, and what they are doing about it. */
-function Turn({
-  player,
-  model,
-  awaitingThrowIn,
-}: {
-  player: BoardSeat;
-  model: BoardModel;
-  awaitingThrowIn: boolean;
-}) {
-  const t = useT();
-  const mine = model.controllable.includes(player.seat);
-  const waiting = model.controllable.length === 0 && !model.finished;
+/**
+ * Keeps a bout on screen for half a second after it leaves the table, flying
+ * towards wherever it went.
+ *
+ * Cards vanishing between two renders is the one moment where the board stops
+ * telling you what happened — you look up and six cards are simply gone, with
+ * no way to tell whether the defender took them or they went to the discard.
+ */
+function useFlight(model: BoardModel): { cards: CardId[]; target: CSSProperties } | null {
+  const previous = useRef<{ table: TableSlot[]; taking: boolean } | null>(null);
+  const [flight, setFlight] = useState<{ cards: CardId[]; target: CSSProperties } | null>(null);
 
-  const text = awaitingThrowIn
-    ? t('board.yourThrowIn')
-    : model.finished
-      ? t('board.gameOver')
-      : mine
-        ? player.seat === model.defenderSeat
-          ? t('turn.you.defend')
-          : player.seat === model.attackerSeat
-            ? t('turn.you.attack')
-            : t('turn.you.act')
-        : waiting
-          ? t('board.waiting')
-          : ' ';
+  useEffect(() => {
+    const before = previous.current;
+    previous.current = { table: model.table, taking: model.defenderTaking };
+    if (before === null || before.table.length === 0 || model.table.length > 0) return;
 
-  return (
-    <div className={`turn${mine || awaitingThrowIn ? ' turn--mine' : ''}`}>
-      <span className="turn__avatar">{initials(player.name)}</span>
-      <p className={`felt__prompt${awaitingThrowIn ? ' felt__prompt--wait' : ''}`}>{text}</p>
-    </div>
-  );
+    const cards = before.table.flatMap((p) => (p.defence === null ? [p.attack] : [p.attack, p.defence]));
+    // Taken cards go to the defender's chair; beaten ones go to the discard,
+    // which lives off to the right of the pile.
+    setFlight({
+      cards,
+      target: (before.taking
+        ? { '--tx': '0vw', '--ty': '34vh' }
+        : { '--tx': '22vw', '--ty': '-4vh' }) as CSSProperties,
+    });
+    const timer = setTimeout(() => setFlight(null), FLIGHT_MS);
+    return () => clearTimeout(timer);
+  }, [model.table, model.defenderTaking]);
+
+  return flight;
+}
+
+/**
+ * Which direction a card came from, as an offset the CSS animation starts at.
+ *
+ * Attacks fly in from the attacker's chair and defences from the defender's.
+ * A card thrown in by a third player therefore arrives from the wrong chair —
+ * the board is given a position, not a move log, and guessing the thrower from
+ * the pile alone would be a guess.
+ */
+function originOf(seat: Seat, chairs: Map<Seat, CSSProperties>): CSSProperties {
+  const chair = chairs.get(seat);
+  if (chair === undefined) return { '--fx': '0vw', '--fy': '34vh' } as CSSProperties;
+  const left = Number.parseFloat(String(chair.left));
+  const top = Number.parseFloat(String(chair.top));
+  return {
+    '--fx': `${(left - 50).toFixed(1)}vw`,
+    '--fy': `${((top - 46) * 0.9).toFixed(1)}vh`,
+  } as CSSProperties;
 }
 
 /** Somebody sitting across the table: a name chip and a small fan of backs. */
@@ -279,31 +333,61 @@ function Opponent({
   );
 }
 
-/** The near edge of the table: your own hand, large, fanned and clickable. */
+/**
+ * The near edge of the table: one name row and your hand, fanned and clickable.
+ *
+ * One row, not two. The chair and the turn indicator used to be separate
+ * strips that said the same thing twice — your name, your role and your card
+ * count, printed above each other.
+ */
 function Me({
   player,
   model,
   playable,
   play,
+  sortBy,
+  hints,
+  showStatus,
 }: {
   player: BoardSeat;
   model: BoardModel;
   playable: Map<CardId, Move>;
   play: (move: Move) => void;
+  sortBy: SortBy;
+  hints: boolean;
+  showStatus: boolean;
 }) {
   const t = useT();
   const canAct = model.actors.includes(player.seat);
-  const hand = player.hand === null ? null : sortForDisplay(player.hand, model.trump);
+  const hand = player.hand === null ? null : sortForDisplay(player.hand, model.trump, sortBy);
   const count = hand?.length ?? player.handCount;
+  const roles = roleLabels(player, model, t);
 
   return (
-    <section aria-label={player.name} className={`seat seat--me${roleClasses(player, model)}`}>
+    <section
+      aria-label={player.name}
+      className={`seat seat--me${roleClasses(player, model)}${canAct ? ' seat--turn' : ''}`}
+    >
       <header className="seat__head">
-        <span className="seat__name">{player.name}</span>
+        <span className="turn__avatar">{initials(player.name)}</span>
+        <span className="seat__who">
+          <span className="seat__name">{player.name}</span>
+          <span className="seat__roles">{roles.join(' · ') || t('role.idle')}</span>
+        </span>
         {player.team === null ? null : (
           <span className="seat__team">{t('team.name', { n: player.team + 1 })}</span>
         )}
-        <span className="seat__roles">{roleLabels(player, model, t).join(' · ') || ' '}</span>
+        {showStatus ? (
+          <span
+            className="chip board__status"
+            title={t('board.trumpIs', { suit: t(SUIT_KEY[model.trump]) })}
+          >
+            {t('board.trump')}{' '}
+            <strong className={model.trump === 1 || model.trump === 2 ? 'red' : ''}>
+              {SUIT_GLYPH[model.trump]}
+            </strong>
+          </span>
+        ) : null}
         <span className="seat__count">{t('board.cards', { count: player.handCount })}</span>
       </header>
 
@@ -320,7 +404,7 @@ function Me({
                   card={cardId}
                   size="lg"
                   style={fan(i, count)}
-                  muted={move === undefined && canAct}
+                  muted={hints && move === undefined && canAct}
                   {...(move ? { onClick: () => play(move) } : {})}
                 />
               );
@@ -396,12 +480,18 @@ const rotate = <T,>(items: readonly T[], by: number): T[] => [
 ];
 
 /**
- * Display order only: plain suits grouped and ascending, trumps last. The
- * engine keeps hands in card-id order for hashing; how they look is a client
- * decision.
+ * Display order only. The engine keeps hands in card-id order for hashing; how
+ * they look is a client decision.
+ *
+ * `suit` groups the suits and puts trumps last, which is how most people hold a
+ * hand. `power` is one run from the card that beats least to the card that
+ * beats most, which is what you want when the question is "what can I still
+ * stop?".
  */
-function sortForDisplay(hand: readonly CardId[], trump: number): CardId[] {
+function sortForDisplay(hand: readonly CardId[], trump: number, sortBy: SortBy): CardId[] {
+  const power = (c: CardId): number => rankOf(c) + (suitOf(c) === trump ? 100 : 0);
   return [...hand].sort((a, b) => {
+    if (sortBy === 'power') return power(a) - power(b);
     const at = suitOf(a) === trump ? 1 : 0;
     const bt = suitOf(b) === trump ? 1 : 0;
     if (at !== bt) return at - bt;

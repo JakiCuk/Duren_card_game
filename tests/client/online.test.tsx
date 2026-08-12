@@ -79,6 +79,33 @@ describe('online room', () => {
     expect(screen.getAllByText('Voľné miesto')).toHaveLength(5);
   });
 
+  it('lets you walk out and puts you back at the entry screen', async () => {
+    const user = userEvent.setup();
+    await goOnline(user);
+    await user.click(screen.getByRole('button', { name: 'Vytvoriť izbu' }));
+    await roomCode();
+
+    await user.click(screen.getByRole('button', { name: 'Opustiť izbu' }));
+    // Back to the way in, with no lingering room to rejoin by accident.
+    expect(await screen.findByRole('button', { name: 'Vytvoriť izbu' })).toBeTruthy();
+    expect(screen.queryByRole('button', { name: 'Kopírovať odkaz' })).toBeNull();
+  });
+
+  it('removes a bot from a room whose game is over', async () => {
+    const user = userEvent.setup();
+    await goOnline(user);
+    await user.click(screen.getByRole('button', { name: 'Vytvoriť izbu' }));
+    await roomCode();
+
+    const seats = screen.getAllByRole('listitem');
+    await user.click(within(seats[1]!).getAllByRole('button', { name: /^\+ Začiatočník$/ })[0]!);
+    await waitFor(() => expect(screen.getAllByText('Voľné miesto')).toHaveLength(4));
+
+    await user.click(screen.getByRole('button', { name: 'Odobrať' }));
+    await waitFor(() => expect(screen.getAllByText('Voľné miesto')).toHaveLength(5));
+    expect(screen.queryByRole('alert')).toBeNull();
+  }, 20_000);
+
   it('says so when the code does not exist', async () => {
     const user = userEvent.setup();
     await goOnline(user);

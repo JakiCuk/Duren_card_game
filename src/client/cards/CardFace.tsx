@@ -1,7 +1,8 @@
 import type { CSSProperties } from 'react';
 import { cardCode, type CardId } from '../../engine/index.js';
 import { useT } from '../i18n/index.js';
-import { defaultTheme, type CardTheme } from './assets.js';
+import type { CardTheme } from './assets.js';
+import { useCardTheme } from './CardThemeContext.js';
 
 export type CardSize = 'sm' | 'md' | 'lg';
 
@@ -29,7 +30,7 @@ export function CardFace({
   card,
   faceDown = false,
   size = 'md',
-  theme = defaultTheme(),
+  theme,
   onClick,
   disabled = false,
   selected = false,
@@ -38,7 +39,10 @@ export function CardFace({
   style,
 }: CardFaceProps) {
   const t = useT();
-  const src = faceDown ? theme.back : theme.card(card);
+  // The hook runs unconditionally; only its result is optional.
+  const fromContext = useCardTheme();
+  const deck = theme ?? fromContext;
+  const src = faceDown ? deck.back : deck.card(card);
   const label = faceDown ? t('card.back') : cardCode(card);
   const className = [
     'card',
@@ -56,7 +60,7 @@ export function CardFace({
       src={src}
       alt={label}
       draggable={false}
-      style={{ aspectRatio: String(theme.aspect) }}
+      style={{ aspectRatio: String(deck.aspect) }}
     />
   );
 
@@ -87,13 +91,16 @@ export function CardFace({
 export function CardBackStack({
   count,
   size = 'md',
-  theme = defaultTheme(),
+  theme,
 }: {
   count: number;
   size?: CardSize;
   theme?: CardTheme;
 }) {
   const t = useT();
+  // The hook runs unconditionally; only its result is optional.
+  const fromContext = useCardTheme();
+  const deck = theme ?? fromContext;
   const layers = Math.min(count, 4);
   return (
     <span className={`stack stack--${size}`} aria-label={t('card.deckOf', { count })}>
@@ -101,10 +108,10 @@ export function CardBackStack({
         <img
           key={i}
           className="stack__layer"
-          src={theme.back}
+          src={deck.back}
           alt=""
           draggable={false}
-          style={{ aspectRatio: String(theme.aspect), translate: `${i * 2}px ${i * -2}px` }}
+          style={{ aspectRatio: String(deck.aspect), translate: `${i * 2}px ${i * -2}px` }}
         />
       ))}
     </span>

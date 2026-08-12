@@ -209,6 +209,130 @@ describe('hub', () => {
     });
   });
 
+  describe('leaving a room', () => {
+    const roomWithBot = (host: Client): string => {
+      send(host, { t: 'room.create', name: 'Roman', config: DEFAULT_RULES });
+      const code = host.sink.last('room.state')!.room.code;
+      send(host, { t: 'room.bot.add', seat: 1, level: 1 });
+      return code;
+    };
+
+    it('frees the seat and drops the room when the last player walks out', () => {
+      const host = connect();
+      const code = roomWithBot(host);
+      send(host, { t: 'room.start' });
+
+      send(host, { t: 'room.leave' });
+      expect(host.sink.last('room.closed')).toBeTruthy();
+      // Gone, not merely quiet: a table of bots must not outlive the people who
+      // sat at it, waiting out the idle sweep while playing itself.
+      expect(hub.rooms.find(code)).toBeUndefined();
+    });
+
+    it('stops the bots the moment the room is gone', () => {
+      const host = connect();
+      roomWithBot(host);
+      send(host, { t: 'room.bot.add', seat: 2, level: 1 });
+      send(host, { t: 'room.start' });
+      send(host, { t: 'room.leave' });
+
+      // Whatever timers were in flight find a room nobody owns and do nothing.
+      clock.runPending();
+      const views = host.sink.all('game.view').length;
+      clock.now += 60_000;
+      clock.runPending();
+      expect(host.sink.all('game.view').length).toBe(views);
+    });
+
+    it('keeps the chair for a dropped socket, but not for somebody who left', () => {
+      const host = connect();
+      const code = roomWithBot(host);
+      const guest = connect();
+      send(guest, { t: 'room.join', code, name: 'Katka' });
+      send(host, { t: 'room.start' });
+
+      hub.disconnect(guest.playerId, guest.sink);
+      const room = hub.rooms.get(code);
+      expect(room.humans().map((h) => h.playerId)).toContain(guest.playerId);
+
+      const back = connect(guest.sink.last('hello.ok')!.token, 'Katka');
+      expect(back.sink.last('hello.ok')!.room?.code).toBe(code);
+    });
+
+    it('finishes the hand with a stand-in when a player walks out mid-game', () => {
+      const host = connect();
+      const code = roomWithBot(host);
+      const guest = connect();
+      send(guest, { t: 'room.join', code, name: 'Katka' });
+      send(host, { t: 'room.start' });
+
+      send(guest, { t: 'room.leave' });
+      expect(hub.rooms.find(code)).toBeDefined();
+
+      // The abandoned hand is still in the deal, so somebody has to play it or
+      // the bout stops on a chair nobody is sitting in. Timers are drained in
+      // bulk: every human move leaves one armed for a step that has passed, and
+      // those no-op stragglers would otherwise soak up the iteration budget.
+      for (let step = 0; step < 400; step++) {
+        clock.now += 100;
+        const view = host.sink.last('game.view')!.view;
+        if (view.finished) break;
+        const move = view.legalMoves[0];
+        if (move) send(host, { t: 'game.move', seq: view.seq, move });
+        else if (clock.runPending(50) === 0) break;
+      }
+      expect(host.sink.last('game.view')!.view.finished).toBe(true);
+    });
+  });
+
+  describe('between games', () => {
+    const finishedRoom = (host: Client): string => {
+      send(host, { t: 'room.create', name: 'Roman', config: DEFAULT_RULES });
+      const code = host.sink.last('room.state')!.room.code;
+      send(host, { t: 'room.bot.add', seat: 1, level: 1 });
+      send(host, { t: 'room.start' });
+
+      for (let step = 0; step < 600; step++) {
+        clock.now += 100;
+        const view = host.sink.last('game.view')!.view;
+        if (view.finished) break;
+        const move = view.legalMoves[0];
+        if (move) send(host, { t: 'game.move', seq: view.seq, move });
+        else if (clock.runPending(1) === 0) break;
+      }
+      expect(host.sink.last('room.state')!.room.phase).toBe('finished');
+      return code;
+    };
+
+    it('lets the host change the table once the game is over', () => {
+      const host = connect();
+      finishedRoom(host);
+      const errorsBefore = host.sink.all('error').length;
+
+      // A finished room is a waiting room with a scoreboard. Refusing these is
+      // what made every seat control dead after the first game.
+      send(host, { t: 'room.bot.remove', seat: 1 });
+      send(host, { t: 'room.bot.add', seat: 1, level: 2 });
+      send(host, { t: 'room.seat', seat: 3 });
+      send(host, { t: 'room.config', config: { ...DEFAULT_RULES, deckSize: 52 } });
+
+      expect(host.sink.all('error').slice(errorsBefore)).toEqual([]);
+      const room = host.sink.last('room.state')!.room;
+      expect(room.seats[1]).toMatchObject({ kind: 'bot', level: 2 });
+      expect(room.seats[3]).toMatchObject({ kind: 'human' });
+      expect(room.config.deckSize).toBe(52);
+    });
+
+    it('lets a newcomer join a room between games', () => {
+      const host = connect();
+      const code = finishedRoom(host);
+      const guest = connect();
+      send(guest, { t: 'room.join', code, name: 'Katka' });
+      expect(guest.sink.last('error')).toBeUndefined();
+      expect(guest.sink.last('room.state')!.you).not.toBeNull();
+    });
+  });
+
   it('restores the game to a client that reconnects with its token', () => {
     const host = connect();
     send(host, { t: 'room.create', name: 'Roman', config: DEFAULT_RULES });

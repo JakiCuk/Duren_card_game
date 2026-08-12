@@ -6,6 +6,10 @@ export type Skin = (typeof SKINS)[number];
 
 export type Theme = 'light' | 'dark';
 
+/** How the cards in your own hand are laid out left to right. */
+export const SORTS = ['suit', 'power'] as const;
+export type SortBy = (typeof SORTS)[number];
+
 export interface Settings {
   /** Pause a bot takes before playing, in milliseconds. */
   botDelayMs: number;
@@ -24,6 +28,17 @@ export interface Settings {
   skin: Skin;
   /** Day or night. Not derived from the OS: the switch is in the header. */
   theme: Theme;
+  /** Which deck the cards are drawn from — see `cards/assets.ts`. */
+  cardTheme: string;
+  /** Suits grouped, or one run from weakest to strongest. */
+  sortBy: SortBy;
+  /**
+   * Highlight which cards are legal right now.
+   *
+   * Off, the hand is drawn plain: playing well then means knowing the rules
+   * rather than reading the shading, which is how the game is played at a table.
+   */
+  hints: boolean;
 }
 
 export const DEFAULT_SETTINGS: Settings = {
@@ -33,6 +48,9 @@ export const DEFAULT_SETTINGS: Settings = {
   showStatus: true,
   skin: 'organic',
   theme: 'light',
+  cardTheme: 'classic',
+  sortBy: 'suit',
+  hints: true,
 };
 
 export const BOT_DELAY_RANGE = { min: 0, max: 4000, step: 100 } as const;
@@ -41,6 +59,9 @@ const KEY = 'durak.settings';
 
 const isSkin = (value: unknown): value is Skin =>
   typeof value === 'string' && (SKINS as readonly string[]).includes(value);
+
+const isSort = (value: unknown): value is SortBy =>
+  typeof value === 'string' && (SORTS as readonly string[]).includes(value);
 
 function load(): Settings {
   if (typeof window === 'undefined') return DEFAULT_SETTINGS;
@@ -58,6 +79,10 @@ function load(): Settings {
       showStatus: parsed.showStatus ?? DEFAULT_SETTINGS.showStatus,
       skin: isSkin(parsed.skin) ? parsed.skin : DEFAULT_SETTINGS.skin,
       theme: parsed.theme === 'dark' ? 'dark' : DEFAULT_SETTINGS.theme,
+      cardTheme:
+        typeof parsed.cardTheme === 'string' ? parsed.cardTheme : DEFAULT_SETTINGS.cardTheme,
+      sortBy: isSort(parsed.sortBy) ? parsed.sortBy : DEFAULT_SETTINGS.sortBy,
+      hints: parsed.hints ?? DEFAULT_SETTINGS.hints,
     };
   } catch {
     // A corrupted entry is not worth a broken page.

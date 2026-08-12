@@ -249,4 +249,14 @@ export const sk: Dictionary = {
   'lobby.fact.code': 'Kód izby',
   'yes': 'áno',
   'no': 'nie',
+
+  // --- decks, sorting, hints ---
+  'settings.cardTheme': 'Balíček kariet',
+  'cards.classic': 'Klasické',
+  'cards.minimal': 'Minimal',
+  'settings.sortBy': 'Zoradiť karty',
+  'sort.suit': 'Podľa farby',
+  'sort.power': 'Podľa sily',
+  'settings.hints': 'Nápoveda ťahu',
+  'settings.hints.hint': 'Stmaví karty, ktoré teraz nemôžeš zahrať. Vypnuté vyzerá ruka rovnako a musíš si to ustrážiť sám.',
 };

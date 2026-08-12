@@ -306,9 +306,18 @@ export class Hub {
     const code = conn.session.roomCode;
     const room = code === null ? undefined : this.rooms.find(code);
     if (!room) return;
-    room.leave(playerId);
-    if (room.humans().length === 0 && room.phase === 'lobby') this.rooms.close(room.code);
-    else this.sendRoomState(room);
+    if (room.phase === 'playing') {
+      // The chair waits: a dropped socket is usually a tunnel, a laptop lid or
+      // a train. Walking out is the other message, and it releases the seat.
+      room.setConnected(playerId, false);
+    } else {
+      room.leave(playerId);
+      if (room.humans().length === 0) {
+        this.rooms.close(room.code);
+        return;
+      }
+    }
+    this.sendRoomState(room);
   }
 
   /** Closes rooms nobody has been connected to for a while. */

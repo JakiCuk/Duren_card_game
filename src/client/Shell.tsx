@@ -1,4 +1,5 @@
 import { useState, type ReactNode } from 'react';
+import { CardThemeProvider } from './cards/CardThemeContext.js';
 import { LanguageSwitch, useT } from './i18n/index.js';
 import type { Settings } from './settings/useSettings.js';
 
@@ -52,6 +53,7 @@ export function Shell({
   const active = menus.find((m) => m.id === open) ?? null;
 
   return (
+    <CardThemeProvider id={settings.cardTheme}>
     <div className="app" data-theme={settings.theme} data-skin={settings.skin}>
       <div className="app__blob app__blob--1" />
       <div className="app__blob app__blob--2" />
@@ -74,14 +76,6 @@ export function Shell({
               {menu.label} {menu.badge === undefined ? '▾' : <span className="pill">{menu.badge}</span>}
             </button>
           ))}
-          <button
-            type="button"
-            className="btn btn--ghost"
-            aria-pressed={settings.showLog}
-            onClick={() => set('showLog', !settings.showLog)}
-          >
-            {t('log.title')}
-          </button>
           {onLeave ? (
             <button type="button" className="btn btn--ghost btn--danger" onClick={onLeave}>
               {t('action.leave')}
@@ -137,6 +131,7 @@ export function Shell({
 
       {children}
     </div>
+    </CardThemeProvider>
   );
 }
 
