@@ -319,16 +319,17 @@ describe('rules panel', () => {
 
 describe('game settings', () => {
   const openSettings = async (user: User): Promise<HTMLElement> => {
-    const panel = screen.getByText('Nastavenia hry').closest('details')!;
-    if (!panel.hasAttribute('open')) await user.click(within(panel).getByText('Nastavenia hry'));
+    const panel = document.querySelector<HTMLElement>('details.panel--setup')!;
+    if (!panel.hasAttribute('open')) {
+      await user.click(within(panel).getByText('Nastavenia a nová hra'));
+    }
     return panel;
   };
 
   it('stays out of the way until asked for', () => {
     renderApp();
-    const panel = screen.getByText('Nastavenia hry').closest('details')!;
     // The knobs exist but are folded away; the table gets the attention.
-    expect(panel.hasAttribute('open')).toBe(false);
+    expect(document.querySelector('details.panel--setup')!.hasAttribute('open')).toBe(false);
   });
 
   it('remembers the bot pause between visits', async () => {
@@ -387,42 +388,52 @@ describe('game settings', () => {
 });
 
 describe('table layout', () => {
-  it('folds the new-game panel away so the table gets the room', () => {
+  it('folds one panel away, not two', () => {
     renderApp();
-    const setup = screen.getByText('Nová hra a pravidlá').closest('details')!;
-    expect(setup.hasAttribute('open')).toBe(false);
+    // Setup and preferences share a single disclosure: hunting through two of
+    // them for "the settings" is one fold-out too many.
+    const panels = document.querySelectorAll('details.panel--setup');
+    expect(panels).toHaveLength(1);
+    expect(panels[0]!.hasAttribute('open')).toBe(false);
+    expect(screen.getByText('Nastavenia a nová hra')).toBeTruthy();
+    expect(within(panels[0] as HTMLElement).getByLabelText('Pauza botov')).toBeTruthy();
   });
 
-  it('keeps the deck inside the centre, clear of every seat', () => {
-    // Regression: the deck used to sit on the left edge of the felt, which is
-    // exactly where the left-hand player sits at three and four players.
+  it('keeps the deck at the table edge and away from every seat', () => {
+    // Regression: the deck sat at the left edge at the same height as the
+    // left-hand player, so at three and four players they overlapped. Seats now
+    // sit along the upper arc and the deck sits below them.
     renderApp();
-    const deck = document.querySelector('.felt__deck');
+    const deck = document.querySelector<HTMLElement>('.felt__deck');
     expect(deck).not.toBeNull();
-    expect(deck!.closest('.felt__centre')).not.toBeNull();
-    expect(document.querySelectorAll('.seat--across .felt__deck')).toHaveLength(0);
+    expect(deck!.closest('.felt__centre')).toBeNull();
+
+    const tops = Array.from(document.querySelectorAll<HTMLElement>('.seat--across')).map((el) =>
+      Number.parseFloat(el.style.top),
+    );
+    expect(tops.length).toBeGreaterThan(0);
+    for (const top of tops) expect(top).toBeLessThan(60);
   });
 
-  it('shows the game info between your name and your cards', async () => {
+  it('shows the game info on the table, above the cards being played', async () => {
     const user = userEvent.setup();
     renderApp();
 
-    const me = document.querySelector('.seat--me')!;
-    const status = me.querySelector('.board__status');
-    expect(status, 'the info row belongs to the player, not the page header').not.toBeNull();
+    const centre = document.querySelector('.felt__centre')!;
+    const status = centre.querySelector('.board__status');
+    expect(status, 'the info row belongs on the table').not.toBeNull();
     expect(status!.textContent).toContain('Tromf');
 
-    // Order matters: name, then info, then the hand.
-    const children = Array.from(me.children);
-    expect(children.indexOf(me.querySelector('.seat__head')!)).toBeLessThan(
-      children.indexOf(status!),
+    // Above the pile, not below it.
+    const children = Array.from(centre.children);
+    expect(children.indexOf(status!)).toBeLessThan(
+      children.indexOf(centre.querySelector('.table')!),
     );
-    expect(children.indexOf(status!)).toBeLessThan(children.indexOf(me.querySelector('.hand')!));
 
-    const panel = screen.getByText('Nastavenia hry').closest('details')!;
-    await user.click(within(panel).getByText('Nastavenia hry'));
+    const panel = document.querySelector<HTMLElement>('details.panel--setup')!;
+    await user.click(within(panel).getByText('Nastavenia a nová hra'));
     await user.click(within(panel).getByLabelText(/Zobraziť údaje o hre/));
-    expect(document.querySelector('.seat--me .board__status')).toBeNull();
+    expect(document.querySelector('.felt__centre .board__status')).toBeNull();
   });
 
   it('gives your own hand the biggest cards on the table', () => {

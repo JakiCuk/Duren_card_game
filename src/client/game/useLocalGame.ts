@@ -5,6 +5,8 @@ import {
   applyMove,
   createGame,
   ctxOf,
+  eligibleAttackers,
+  hasUnbeaten,
   legalMoves,
   redact,
   redactEvents,
@@ -110,21 +112,10 @@ export function useLocalGame(
 
   const isBot = useCallback((seat: Seat) => bots.current.has(seat), []);
 
-  /**
-   * A human seat that could add a card to the pile right now.
-   *
-   * "Could throw in" means an attack onto a table that already has cards — the
-   * opening attack is compulsory and nobody needs protecting from it.
-   */
-  const pendingThrowIn = useMemo(() => {
-    if (state.phase !== 'bout' || state.table.length === 0) return null;
-    const ctx = ctxOf(state);
-    for (const seat of actors) {
-      if (bots.current.has(seat)) continue;
-      if (legalMoves(ctx, seat).some((m) => m.t === 'ATTACK')) return seat;
-    }
-    return null;
-  }, [state, actors]);
+  const pendingThrowIn = useMemo(
+    () => boutWaitsOnlyOn(state, (seat) => bots.current.has(seat)),
+    [state],
+  );
 
   // One bot move per tick, so the table animates rather than jumping.
   useEffect(() => {
@@ -178,4 +169,33 @@ function start(setup: LocalGameSetup): Snapshot {
     seed: setup.seed,
   });
   return { state, events };
+}
+
+/**
+ * The human seat whose throw-in is the only thing still holding the bout open.
+ *
+ * Not simply "could throw in": mid-bout the defender still has to answer, and
+ * pausing there would ask you to confirm after every single card you add. The
+ * question belongs at the end — everything on the table settled, every other
+ * attacker done, and the bout closes the moment you say so.
+ */
+export function boutWaitsOnlyOn(
+  state: GameState,
+  isBot: (seat: Seat) => boolean,
+): Seat | null {
+  if (state.phase !== 'bout' || state.table.length === 0) return null;
+  const ctx = ctxOf(state);
+
+  // Something on the table is still unanswered, so the defender moves next.
+  if (!state.defenderTaking && hasUnbeaten(ctx)) return null;
+
+  const attackers = eligibleAttackers(ctx);
+  // A bot might still pile on; it is not our decision alone yet.
+  if (attackers.some((seat) => isBot(seat) && state.passed[seat] !== true)) return null;
+
+  for (const seat of attackers) {
+    if (isBot(seat) || state.passed[seat] === true) continue;
+    if (legalMoves(ctx, seat).some((m) => m.t === 'ATTACK')) return seat;
+  }
+  return null;
 }

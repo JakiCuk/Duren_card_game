@@ -81,7 +81,7 @@ export const uk: Dictionary = {
   'board.yourThrowIn': 'Можеш підкинути — зіграй карту або натисни «Біто».',
   'settings.showStatus': 'Показувати дані гри',
   'settings.showStatus.hint': 'Козир, коло, залишок колоди та відбій — над твоїми картами.',
-  'setup.title': 'Нова гра та правила',
+  'setup.title': 'Налаштування та нова гра',
   'card.back': 'Сорочка',
   'card.deckOf': 'У колоді {count} карт',
 

@@ -7,17 +7,19 @@ export interface SettingsPanelProps {
 }
 
 /**
- * Kept behind a disclosure on purpose: these are comfort knobs, and a row of
- * sliders above the table would compete with the game for attention every time
- * you sit down.
+ * The comfort knobs, rendered as a plain block.
+ *
+ * No disclosure of its own: it sits inside the one panel the page already has,
+ * because two separate fold-outs for "how the game is set up" and "how it
+ * behaves" is one more thing to hunt through than anybody needs.
  */
 export function SettingsPanel({ settings, set }: SettingsPanelProps) {
   const t = useT();
   const seconds = (settings.botDelayMs / 1000).toFixed(1);
 
   return (
-    <details className="settings">
-      <summary>{t('settings.title')}</summary>
+    <section className="settings">
+      <h3>{t('settings.title')}</h3>
 
       <div className="settings__body">
         <label className="settings__row">
@@ -73,6 +75,6 @@ export function SettingsPanel({ settings, set }: SettingsPanelProps) {
           </span>
         </label>
       </div>
-    </details>
+    </section>
   );
 }

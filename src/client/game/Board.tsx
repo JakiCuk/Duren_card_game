@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState, type CSSProperties, type ReactNode } from 'react';
+import { useEffect, useMemo, useState, type CSSProperties } from 'react';
 import { cardCode, rankOf, suitOf, type CardId, type Move, type Seat } from '../../engine/index.js';
 import { CardBackStack, CardFace } from '../cards/CardFace.js';
 import { useT, type Translate } from '../i18n/index.js';
@@ -86,25 +86,27 @@ export function Board({ model, play, awaitingThrowIn = false, showStatus = true 
   return (
     <div className="board">
       <div className="felt">
+        <div className="felt__deck">
+          {model.deckCount > 0 ? (
+            <>
+              {model.trumpCard !== null ? (
+                <span className="deck__trump">
+                  <CardFace card={model.trumpCard} size="sm" title={t('board.trumpCard')} />
+                </span>
+              ) : null}
+              <CardBackStack count={model.deckCount} size="sm" />
+            </>
+          ) : (
+            <span className="deck__empty">{t('board.deckEmpty')}</span>
+          )}
+        </div>
+
         {others.map((p, i) => (
-          <Opponent key={p.seat} player={p} model={model} style={seatPosition(i + 1, model.seats.length)} />
+          <Opponent key={p.seat} player={p} model={model} style={seatPosition(i + 1, others.length)} />
         ))}
 
         <div className="felt__centre">
-          <div className="felt__deck">
-            {model.deckCount > 0 ? (
-              <>
-                {model.trumpCard !== null ? (
-                  <span className="deck__trump">
-                    <CardFace card={model.trumpCard} size="sm" title={t('board.trumpCard')} />
-                  </span>
-                ) : null}
-                <CardBackStack count={model.deckCount} size="sm" />
-              </>
-            ) : (
-              <span className="deck__empty">{t('board.deckEmpty')}</span>
-            )}
-          </div>
+          {status}
 
           <div className="table" aria-label={t('board.table')}>
             {model.table.length === 0 ? (
@@ -182,7 +184,7 @@ export function Board({ model, play, awaitingThrowIn = false, showStatus = true 
         </div>
       </div>
 
-      <Me player={me} model={model} playable={playableCards} play={play} status={status} />
+      <Me player={me} model={model} playable={playableCards} play={play} />
     </div>
   );
 }
@@ -232,13 +234,11 @@ function Me({
   model,
   playable,
   play,
-  status,
 }: {
   player: BoardSeat;
   model: BoardModel;
   playable: Map<CardId, Move>;
   play: (move: Move) => void;
-  status: ReactNode;
 }) {
   const t = useT();
   const canAct = model.actors.includes(player.seat);
@@ -253,8 +253,6 @@ function Me({
         <span className="seat__roles">{roleLabels(player, model, t).join(' · ') || ' '}</span>
         <span className="seat__count">{t('board.cards', { count: player.handCount })}</span>
       </header>
-
-      {status}
 
       <div className="hand">
         {player.hand === null
@@ -300,12 +298,22 @@ const roleClasses = (p: BoardSeat, model: BoardModel): string =>
   `${p.connected ? '' : ' seat--away'}` +
   `${p.team === null ? '' : ` seat--team${p.team}`}`;
 
-/** Index 0 is always you at the bottom; the rest go round from there. */
-function seatPosition(index: number, total: number): CSSProperties {
-  const angle = Math.PI / 2 + (index * 2 * Math.PI) / total;
+/**
+ * Opponents sit along the far edge, spread across the top of the table.
+ *
+ * An evenly spaced ring would put somebody at the left edge at four players and
+ * at the lower left at five — which is where the deck lies. Keeping everybody
+ * on the upper arc leaves that corner free whatever the table size, and it also
+ * reads more like a real table, where you face the other players rather than
+ * sitting beside them.
+ */
+function seatPosition(index: number, others: number): CSSProperties {
+  const from = (200 * Math.PI) / 180;
+  const to = (340 * Math.PI) / 180;
+  const angle = others === 1 ? (270 * Math.PI) / 180 : from + ((index - 1) * (to - from)) / (others - 1);
   return {
-    left: `${50 + 41 * Math.cos(angle)}%`,
-    top: `${50 + 40 * Math.sin(angle)}%`,
+    left: `${50 + 40 * Math.cos(angle)}%`,
+    top: `${50 + 42 * Math.sin(angle)}%`,
   };
 }
 

@@ -76,7 +76,7 @@ export const en: Dictionary = {
   'board.yourThrowIn': 'You can throw in \u2014 play a card or press \u201cDone\u201d.',
   'settings.showStatus': 'Show the game info',
   'settings.showStatus.hint': 'Trump, bout, deck and discard — right above your hand.',
-  'setup.title': 'New game and rules',
+  'setup.title': 'Settings and new game',
   'card.back': 'Card back',
   'card.deckOf': '{count} cards in the deck',
 

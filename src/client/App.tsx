@@ -3,6 +3,8 @@ import { BOT_CATALOGUE, type BotLevel } from '../bots/index.js';
 import type { GameResult } from '../engine/index.js';
 import { DEFAULT_RULES, validateConfig, type ConfigProblem, type RuleConfig } from '../shared/rules.js';
 import type { Settings } from './settings/useSettings.js';
+
+type SetSetting = <K extends keyof Settings>(key: K, value: Settings[K]) => void;
 import { CLIENT_VERSION } from '../shared/version.js';
 import { Board } from './game/Board.js';
 import { describeEvent, describePublicEvent } from './game/log.js';
@@ -45,12 +47,10 @@ export function App() {
         </nav>
       </header>
 
-      <SettingsPanel settings={settings} set={set} />
-
       {mode === 'local' ? (
-        <LocalGame settings={settings} />
+        <LocalGame settings={settings} set={set} />
       ) : (
-        <OnlineGame settings={settings} />
+        <OnlineGame settings={settings} set={set} />
       )}
 
       <footer className="footer">
@@ -67,7 +67,7 @@ export function App() {
 
 // --- on this device ---------------------------------------------------------
 
-function LocalGame({ settings }: { settings: Settings }) {
+function LocalGame({ settings, set }: { settings: Settings; set: SetSetting }) {
   const t = useT();
   // A player at the table, not a chair in the setup panel — different words on
   // purpose, so the two never collide in the UI.
@@ -189,6 +189,8 @@ function LocalGame({ settings }: { settings: Settings }) {
 
         <RulesPanel config={draft.config} onChange={(config) => setDraft({ ...draft, config })} />
 
+        <SettingsPanel settings={settings} set={set} />
+
         {verdict.errors.length > 0 ? (
           <p className="problem problem--error">
             {verdict.errors.map((p) => explain(p, t)).join(' ')}
@@ -218,7 +220,7 @@ function LocalGame({ settings }: { settings: Settings }) {
 
 // --- online room ------------------------------------------------------------
 
-function OnlineGame({ settings }: { settings: Settings }) {
+function OnlineGame({ settings, set }: { settings: Settings; set: SetSetting }) {
   const t = useT();
   const net = useOnline(true);
   const [name, setName] = useState(() => net.savedName() || 'Hráč');
@@ -266,6 +268,11 @@ function OnlineGame({ settings }: { settings: Settings }) {
       <p className="lede">
         {t('mode.onlineLede')} <ConnectionBadge state={net.connection} />
       </p>
+
+      <details className="panel panel--setup">
+        <summary>{t('settings.title')}</summary>
+        <SettingsPanel settings={settings} set={set} />
+      </details>
 
       {net.error !== null ? (
         <p className="problem problem--error" role="alert" onClick={net.clearError}>
