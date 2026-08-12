@@ -30,8 +30,14 @@ export const defaultSetup = (): LocalGameSetup => ({
   bots: [null, 2],
 });
 
-/** Bots pause before moving so the table stays readable. */
-const thinkingMs = (level: BotLevel): number => 350 + level * 150;
+/**
+ * How long a bot waits before playing.
+ *
+ * The player's setting is the whole budget; stronger levels are given a little
+ * more of it so the pause reads as thinking rather than lag.
+ */
+const thinkingMs = (level: BotLevel, budget: number): number =>
+  budget <= 0 ? 0 : Math.round(budget * (0.6 + level * 0.1));
 
 interface Snapshot {
   state: GameState;
@@ -45,7 +51,16 @@ interface Snapshot {
  * is what proves the engine's API is usable, and it does so before there is any
  * network code to blame.
  */
-export function useLocalGame(initial: LocalGameSetup = defaultSetup()) {
+export interface LocalGameOptions {
+  botDelayMs: number;
+  /** Freeze the bots while a human still has a card they could throw in. */
+  holdForThrowIn: boolean;
+}
+
+export function useLocalGame(
+  initial: LocalGameSetup = defaultSetup(),
+  options: LocalGameOptions = { botDelayMs: 900, holdForThrowIn: true },
+) {
   const [setup, setSetup] = useState<LocalGameSetup>(initial);
   const [history, setHistory] = useState<Snapshot[]>(() => [start(initial)]);
   const bots = useRef<Map<Seat, BotPolicy>>(new Map());
@@ -93,18 +108,41 @@ export function useLocalGame(initial: LocalGameSetup = defaultSetup()) {
     for (const [seat, bot] of bots.current) bot.observe(redactEvents(fresh, seat));
   }, [current.events]);
 
+  const isBot = useCallback((seat: Seat) => bots.current.has(seat), []);
+
+  /**
+   * A human seat that could add a card to the pile right now.
+   *
+   * "Could throw in" means an attack onto a table that already has cards — the
+   * opening attack is compulsory and nobody needs protecting from it.
+   */
+  const pendingThrowIn = useMemo(() => {
+    if (state.phase !== 'bout' || state.table.length === 0) return null;
+    const ctx = ctxOf(state);
+    for (const seat of actors) {
+      if (bots.current.has(seat)) continue;
+      if (legalMoves(ctx, seat).some((m) => m.t === 'ATTACK')) return seat;
+    }
+    return null;
+  }, [state, actors]);
+
   // One bot move per tick, so the table animates rather than jumping.
   useEffect(() => {
     if (state.phase !== 'bout') return;
+    // Hold everything while the player still has a card they could add: a bot
+    // piling on first would take the decision away before they saw it.
+    if (options.holdForThrowIn && pendingThrowIn !== null) return;
+
     const seat = actors.find((s) => bots.current.has(s));
     if (seat === undefined) return;
 
     const bot = bots.current.get(seat)!;
-    const timer = setTimeout(() => play(bot.chooseMove(redact(state, seat))), thinkingMs(bot.level));
+    const timer = setTimeout(
+      () => play(bot.chooseMove(redact(state, seat))),
+      thinkingMs(bot.level, options.botDelayMs),
+    );
     return () => clearTimeout(timer);
-  }, [state, actors, play]);
-
-  const isBot = useCallback((seat: Seat) => bots.current.has(seat), []);
+  }, [state, actors, play, options.botDelayMs, options.holdForThrowIn, pendingThrowIn]);
 
   return {
     setup,
@@ -116,6 +154,8 @@ export function useLocalGame(initial: LocalGameSetup = defaultSetup()) {
     undo,
     restart,
     isBot,
+    /** Set while a human could still throw in, so the UI can say so. */
+    pendingThrowIn,
     /** Seats a human may act for — bots are not clickable. */
     humanActors: actors.filter((s) => !bots.current.has(s)),
     canUndo: history.length > 1,

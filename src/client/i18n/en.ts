@@ -65,6 +65,15 @@ export const en: Dictionary = {
   'board.waiting': 'Waiting for the others…',
   'board.cards': { one: '{count} card', other: '{count} cards' },
 
+  'settings.title': 'Game settings',
+  'settings.botSpeed': 'Bot pause',
+  'settings.botSpeed.hint': 'How long a bot waits before playing a card. Zero means instantly.',
+  'settings.seconds': '{n} s',
+  'settings.holdForThrowIn': 'Wait for me when I could throw in',
+  'settings.holdForThrowIn.hint': 'Bots stop until you play or press \u201cDone\u201d. Without it somebody can pile on before you have noticed you had a card.',
+  'settings.showLog': 'Show the transcript',
+  'settings.showLog.hint': 'A side column of who played what.',
+  'board.yourThrowIn': 'You can throw in \u2014 play a card or press \u201cDone\u201d.',
   'card.back': 'Card back',
   'card.deckOf': '{count} cards in the deck',
 

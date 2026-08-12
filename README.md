@@ -5,6 +5,23 @@ Webová kartová hra Durak — proti botom (4 úrovne zložitosti) aj proti živ
 Jedna Node aplikácia: Fastify servíruje statický React build aj WebSocket. Bez databázy,
 bez účtov — izby sa vytvárajú anonymne a zdieľajú kódom.
 
+## Vzhľad a nastavenia
+
+Stôl je okrúhly a vždy sa točí tak, aby si sedel dole: tvoje karty pozdĺž spodnej
+hrany, ostatní hráči okolo, kôpka v strede a tlačidlá priamo pod ňou. Nad stolom sú
+informácie o tromfe, kole a balíku, vpravo voliteľný prepis odohraných kariet.
+
+Pod hlavičkou je zložené **Nastavenia hry** (schované, kým ich nerozbalíš):
+
+- **Pauza botov** — ako dlho bot počká, kým položí kartu. Nula = okamžite.
+- **Počkať na mňa, keď môžem prihodiť** — boti sa zastavia, kým nezahráš alebo
+  nestlačíš „Bito". Bez toho ti pri troch a viacerých hráčoch môže iný útočník
+  prihodiť skôr, než si vôbec všimneš, že si mohol aj ty.
+- **Zobraziť prepis hry** — bočný stĺpec s tým, kto čo položil.
+
+Nastavenia sa pamätajú v prehliadači. Pauza botov platí pre hru na tomto zariadení;
+v online izbe tempo botov určuje server (`BOT_DELAY_MS`).
+
 ## Ako sa k hre pripojiť
 
 ```bash
@@ -82,6 +99,12 @@ Pri L4 rozhoduje **počet vzoriek**: 8 determinizácií dá 34 %, 18 dá 51 %, 6
 Pod tou hranicou hľadanie neváži ťahy, ale meria vlastný šum. Horizont 4 je *horší*
 než 2 — to je známa patológia PIMC (strategy fusion) presne tam, kde ju literatúra
 predpovedá.
+
+**Cena L4:** medián 32 ms na rozhodnutie, p90 81 ms, p99 261 ms (merané samostatne).
+Pri nastavenej pauze bota (~0,9 s) to hráč nepocíti. Beží synchrónne — worker pool by
+za ohraničených ~300 ms pridal serializáciu pohľadu, správu workerov a nový režim
+zlyhania. Ak by na jednom serveri bežali desiatky izieb naraz s L4, vtedy je čas ich
+pridať; dovtedy nie.
 
 **Blafovanie je poctivo zmerané:** proti botovi, ktorý o nás nič neodvodzuje,
 neprináša nič (66,5 % s ním, 65,8 % bez neho — v šume). Váha 0,5 už stojí šesť bodov.

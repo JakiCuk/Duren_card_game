@@ -70,6 +70,15 @@ export const uk: Dictionary = {
     other: '{count} карти',
   },
 
+  'settings.title': 'Налаштування гри',
+  'settings.botSpeed': 'Пауза ботів',
+  'settings.botSpeed.hint': 'Скільки бот чекає перед тим, як покласти карту. Нуль — миттєво.',
+  'settings.seconds': '{n} с',
+  'settings.holdForThrowIn': 'Зачекати на мене, коли можу підкинути',
+  'settings.holdForThrowIn.hint': 'Боти зупиняться, доки ти не зіграєш або не натиснеш «Біто». Без цього хтось може підкинути раніше, ніж ти це помітиш.',
+  'settings.showLog': 'Показувати перебіг гри',
+  'settings.showLog.hint': 'Бічна колонка з тим, хто що поклав.',
+  'board.yourThrowIn': 'Можеш підкинути — зіграй карту або натисни «Біто».',
   'card.back': 'Сорочка',
   'card.deckOf': 'У колоді {count} карт',
 

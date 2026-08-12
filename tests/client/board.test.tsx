@@ -1,5 +1,5 @@
 // @vitest-environment jsdom
-import { cleanup, screen, waitFor, within } from '@testing-library/react';
+import { cleanup, fireEvent, screen, waitFor, within } from '@testing-library/react';
 // Named import, not default: under NodeNext resolution the default export of
 // this package does not carry its type.
 import { userEvent } from '@testing-library/user-event';
@@ -47,20 +47,34 @@ const tableCards = (): HTMLElement[] => {
   return within(table).queryAllByRole('img');
 };
 
-const seatSection = (name: string): HTMLElement => {
-  const heading = screen.getByRole('button', { name });
-  const section = heading.closest('section');
-  if (!section) throw new Error(`No seat panel for ${name}`);
-  return section;
-};
+const seatSection = (name: string): HTMLElement => screen.getByRole('region', { name });
 
 const handCards = (name: string): HTMLElement[] =>
   Array.from(seatSection(name).querySelectorAll('.hand .card img'));
 
-const playableCards = (name: string): HTMLElement[] =>
-  Array.from(seatSection(name).querySelectorAll('.hand button.card:not(:disabled)')).filter(
-    (el) => !el.classList.contains('card--muted'),
-  ) as HTMLElement[];
+/**
+ * The seat the table is currently centred on.
+ *
+ * The board is drawn from one chair: only that player's cards are clickable,
+ * and handing the device over is an explicit button.
+ */
+const mySeatName = (): string => {
+  const name = document.querySelector('.seat--me .seat__name')?.textContent;
+  if (!name) throw new Error('No seat is being played');
+  return name;
+};
+
+/** Cards the player at the bottom of the table can actually play right now. */
+const playableCards = (): HTMLElement[] =>
+  Array.from(
+    document.querySelectorAll<HTMLElement>('.seat--me .hand button.card:not(:disabled)'),
+  ).filter((el) => !el.classList.contains('card--muted'));
+
+/** Hands the device to another seat, if the board offers that. */
+const switchTo = async (user: User, name: string): Promise<void> => {
+  const button = screen.queryByRole('button', { name: `Prepnúť na ${name}` });
+  if (button) await user.click(button);
+};
 
 describe('hot-seat board', () => {
   it('deals a visible game to every seat', async () => {
@@ -77,8 +91,11 @@ describe('hot-seat board', () => {
     await renderHotSeat(user);
 
     const attacker = attackerName();
+    await switchTo(user, attacker);
+    expect(mySeatName()).toBe(attacker);
+
     const before = handCards(attacker).length;
-    const options = playableCards(attacker);
+    const options = playableCards();
     expect(options.length).toBeGreaterThan(0);
 
     await user.click(options[0]!);
@@ -92,16 +109,15 @@ describe('hot-seat board', () => {
     await renderHotSeat(user);
 
     const attacker = attackerName();
-    await user.click(playableCards(attacker)[0]!);
+    await switchTo(user, attacker);
+    await user.click(playableCards()[0]!);
 
     const defenderName = attacker === 'Hráč 1' ? 'Hráč 2' : 'Hráč 1';
     const handBefore = handCards(defenderName).length;
 
     // Hot-seat: the attacker may still be able to throw in, so control does not
     // jump on its own. Hand the device to the defender.
-    const handover = screen.queryByRole('button', { name: `Prepnúť na ${defenderName}` });
-    if (handover) await user.click(handover);
-
+    await switchTo(user, defenderName);
     await user.click(screen.getByRole('button', { name: 'Beriem' }));
 
     // Declaring a take does not collect the cards: the attackers still get to
@@ -110,8 +126,7 @@ describe('hot-seat board', () => {
       expect(seatSection(defenderName).textContent).toContain('berie');
       expect(handCards(defenderName)).toHaveLength(handBefore);
 
-      const back = screen.queryByRole('button', { name: `Prepnúť na ${attacker}` });
-      if (back) await user.click(back);
+      await switchTo(user, attacker);
       await user.click(screen.getByRole('button', { name: 'Bito / koniec prihadzovania' }));
     }
 
@@ -124,7 +139,8 @@ describe('hot-seat board', () => {
     await renderHotSeat(user);
 
     const attacker = attackerName();
-    await user.click(playableCards(attacker)[0]!);
+    await switchTo(user, attacker);
+    await user.click(playableCards()[0]!);
     expect(tableCards().length).toBeGreaterThanOrEqual(1);
 
     await user.click(screen.getByRole('button', { name: 'Späť' }));
@@ -156,9 +172,7 @@ describe('hot-seat board', () => {
     for (let step = 0; step < 400; step++) {
       if (resultBanner() !== null) break;
 
-      const cards = Array.from(document.querySelectorAll('.seat--active .hand button.card')).filter(
-        (el) => !el.classList.contains('card--muted'),
-      ) as HTMLElement[];
+      const cards = playableCards();
       const buttons = ['Beriem', 'Bito / koniec prihadzovania']
         .map((name) => screen.queryByRole('button', { name }))
         .filter((b): b is HTMLElement => b !== null);
@@ -210,9 +224,11 @@ describe('playing against a bot', () => {
 
   it('does not let a human act for the bot', () => {
     renderApp();
-    expect(within(seatPanel('Hráč 2')).queryByRole('button', { name: /^Prepnúť/ })).toBeNull();
-    expect(screen.getByRole('button', { name: 'Hráč 2' }).hasAttribute('disabled')).toBe(true);
-    expect(within(seatPanel('Hráč 2')).queryAllByRole('button', { name: /^[2-9TJQKA][CDHS]$/ })).toHaveLength(0);
+    // The bot sits across the table: no clickable cards, and no way to take
+    // over its chair.
+    expect(seatPanel('Hráč 2').className).toContain('seat--across');
+    expect(within(seatPanel('Hráč 2')).queryAllByRole('button')).toHaveLength(0);
+    expect(screen.queryByRole('button', { name: 'Prepnúť na Hráč 2' })).toBeNull();
   });
 
   it('answers on its own without any further clicks', async () => {
@@ -220,7 +236,7 @@ describe('playing against a bot', () => {
     renderApp();
 
     // If the human opens, play one card; otherwise the bot opens by itself.
-    const mine = playableCards('Hráč 1');
+    const mine = playableCards();
     if (mine.length > 0) await user.click(mine[0]!);
 
     await waitFor(
@@ -290,9 +306,7 @@ describe('rules panel', () => {
           found = true;
           break;
         }
-        const cards = Array.from(
-          document.querySelectorAll('.seat--active .hand button.card'),
-        ).filter((el) => !el.classList.contains('card--muted')) as HTMLElement[];
+        const cards = playableCards();
         const switches = screen.queryAllByRole('button', { name: /^Prepnúť na / });
         const next = cards[0] ?? switches[0];
         if (!next) break;
@@ -301,4 +315,73 @@ describe('rules panel', () => {
     }
     expect(found, 'no deal in 25 seeds ever offered a transfer').toBe(true);
   }, 60_000);
+});
+
+describe('game settings', () => {
+  const openSettings = async (user: User): Promise<HTMLElement> => {
+    const panel = screen.getByText('Nastavenia hry').closest('details')!;
+    if (!panel.hasAttribute('open')) await user.click(within(panel).getByText('Nastavenia hry'));
+    return panel;
+  };
+
+  it('stays out of the way until asked for', () => {
+    renderApp();
+    const panel = screen.getByText('Nastavenia hry').closest('details')!;
+    // The knobs exist but are folded away; the table gets the attention.
+    expect(panel.hasAttribute('open')).toBe(false);
+  });
+
+  it('remembers the bot pause between visits', async () => {
+    const user = userEvent.setup();
+    renderApp();
+    const panel = await openSettings(user);
+
+    const slider = within(panel).getByLabelText<HTMLInputElement>('Pauza botov');
+    expect(Number(slider.value)).toBeGreaterThan(0);
+
+    fireEvent.change(slider, { target: { value: '2500' } });
+    expect(within(panel).getByText('2.5 s')).toBeTruthy();
+    expect(JSON.parse(localStorage.getItem('durak.settings')!)).toMatchObject({
+      botDelayMs: 2500,
+    });
+  });
+
+  it('hides and restores the transcript', async () => {
+    const user = userEvent.setup();
+    renderApp();
+    expect(document.querySelector('.log')).not.toBeNull();
+
+    const panel = await openSettings(user);
+    await user.click(within(panel).getByLabelText(/Zobraziť prepis hry/));
+    expect(document.querySelector('.log')).toBeNull();
+
+    await user.click(within(panel).getByLabelText(/Zobraziť prepis hry/));
+    expect(document.querySelector('.log')).not.toBeNull();
+  });
+
+  it('holds the bots while the player still has a card to throw in', async () => {
+    const user = userEvent.setup();
+    renderApp();
+
+    // Open with a card the bot cannot sweep away before we look: with the hold
+    // on, nothing moves until we play or pass.
+    for (let step = 0; step < 12; step++) {
+      const options = playableCards();
+      if (options.length === 0) break;
+      await user.click(options[0]!);
+      const prompt = document.querySelector('.felt__prompt--wait');
+      if (prompt) {
+        expect(prompt.textContent).toMatch(/prihodiť/);
+        // The pass button is highlighted as the way out of the wait.
+        expect(
+          screen.getByRole('button', { name: 'Bito / koniec prihadzovania' }).className,
+        ).toContain('btn--primary');
+        return;
+      }
+    }
+    // Not every deal reaches a throw-in decision; the setting is still wired.
+    expect(JSON.parse(localStorage.getItem('durak.settings')!)).toMatchObject({
+      holdForThrowIn: true,
+    });
+  }, 30_000);
 });

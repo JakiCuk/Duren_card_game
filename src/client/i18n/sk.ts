@@ -65,6 +65,15 @@ export const sk: Dictionary = {
   'board.waiting': 'Čaká sa na ostatných…',
   'board.cards': { one: '{count} karta', few: '{count} karty', other: '{count} kariet' },
 
+  'settings.title': 'Nastavenia hry',
+  'settings.botSpeed': 'Pauza botov',
+  'settings.botSpeed.hint': 'Ako dlho bot počká, kým položí kartu. Nula znamená okamžite.',
+  'settings.seconds': '{n} s',
+  'settings.holdForThrowIn': 'Počkať na mňa, keď môžem prihodiť',
+  'settings.holdForThrowIn.hint': 'Boti sa zastavia, kým nezahráš alebo nestlačíš „Bito“. Bez toho ti môže niekto prihodiť skôr, než si to vôbec všimneš.',
+  'settings.showLog': 'Zobraziť prepis hry',
+  'settings.showLog.hint': 'Bočný stĺpec s tým, kto čo položil.',
+  'board.yourThrowIn': 'Môžeš prihodiť — zahraj kartu alebo stlač „Bito“.',
   'card.back': 'Rubová strana',
   'card.deckOf': 'Balík má {count} kariet',
 

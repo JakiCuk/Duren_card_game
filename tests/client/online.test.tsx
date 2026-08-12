@@ -106,12 +106,11 @@ describe('online room', () => {
 
     // The board replaces the lobby once the deal arrives.
     await screen.findByLabelText('Stôl', {}, { timeout: 5000 });
-    const mine = document.querySelectorAll('.seat:first-child .hand .card img');
+    const mine = document.querySelectorAll('.seat--me .hand .card img');
     expect(mine.length).toBe(6);
 
     // The opponent is a bot and its cards are backs, never codes.
-    const board = document.querySelector('.seats')!;
-    const faceUp = Array.from(board.querySelectorAll('.hand .card img')).filter(
+    const faceUp = Array.from(document.querySelectorAll('.seat .hand .card img')).filter(
       (img) => img.getAttribute('alt') !== 'Rubová strana',
     );
     expect(faceUp).toHaveLength(6);
@@ -134,7 +133,7 @@ describe('online room', () => {
     await waitFor(
       () => {
         const playable = document.querySelectorAll(
-          '.seat--active .hand button.card:not(.card--muted)',
+          '.seat--me .hand button.card:not(.card--muted)',
         );
         expect(playable.length).toBeGreaterThan(0);
       },
@@ -146,7 +145,7 @@ describe('online room', () => {
     // records that the move happened either way.
     const before = document.querySelectorAll('.log li').length;
     await user.click(
-      document.querySelector<HTMLElement>('.seat--active .hand button.card:not(.card--muted)')!,
+      document.querySelector<HTMLElement>('.seat--me .hand button.card:not(.card--muted)')!,
     );
 
     await waitFor(

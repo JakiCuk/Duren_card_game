@@ -2,6 +2,7 @@ import { useMemo, useState } from 'react';
 import { BOT_CATALOGUE, type BotLevel } from '../bots/index.js';
 import type { GameResult } from '../engine/index.js';
 import { DEFAULT_RULES, validateConfig, type ConfigProblem, type RuleConfig } from '../shared/rules.js';
+import type { Settings } from './settings/useSettings.js';
 import { CLIENT_VERSION } from '../shared/version.js';
 import { Board } from './game/Board.js';
 import { describeEvent, describePublicEvent } from './game/log.js';
@@ -11,12 +12,15 @@ import { defaultSetup, useLocalGame, type LocalGameSetup } from './game/useLocal
 import { LanguageSwitch, useI18n, useT, type Translate } from './i18n/index.js';
 import { Lobby } from './net/Lobby.js';
 import { useOnline } from './net/useOnline.js';
+import { SettingsPanel } from './settings/SettingsPanel.js';
+import { useSettings } from './settings/useSettings.js';
 
 type Mode = 'local' | 'online';
 
 export function App() {
   const { t } = useI18n();
   const [mode, setMode] = useState<Mode>('local');
+  const { settings, set } = useSettings();
 
   return (
     <main className="shell">
@@ -41,7 +45,13 @@ export function App() {
         </nav>
       </header>
 
-      {mode === 'local' ? <LocalGame /> : <OnlineGame />}
+      <SettingsPanel settings={settings} set={set} />
+
+      {mode === 'local' ? (
+        <LocalGame settings={settings} />
+      ) : (
+        <OnlineGame settings={settings} />
+      )}
 
       <footer className="footer">
         <span>v{CLIENT_VERSION}</span>
@@ -57,12 +67,15 @@ export function App() {
 
 // --- on this device ---------------------------------------------------------
 
-function LocalGame() {
+function LocalGame({ settings }: { settings: Settings }) {
   const t = useT();
   // A player at the table, not a chair in the setup panel — different words on
   // purpose, so the two never collide in the UI.
   const localSeatName = (seat: number): string => t('player.seat', { n: seat + 1 });
-  const game = useLocalGame(defaultSetup());
+  const game = useLocalGame(defaultSetup(), {
+    botDelayMs: settings.botDelayMs,
+    holdForThrowIn: settings.holdForThrowIn,
+  });
   const [draft, setDraft] = useState<LocalGameSetup>(game.setup);
 
   const verdict = useMemo(() => validateConfig(draft.config, draft.players), [draft]);
@@ -189,15 +202,21 @@ function LocalGame() {
 
       {game.state.result ? <ResultBanner result={game.state.result} seatName={localSeatName} /> : null}
 
-      <Board model={model} play={game.play} />
-      <Log lines={log} />
+      <div className="stage">
+        <Board
+          model={model}
+          play={game.play}
+          awaitingThrowIn={settings.holdForThrowIn && game.pendingThrowIn !== null}
+        />
+        {settings.showLog ? <Log lines={log} /> : null}
+      </div>
     </>
   );
 }
 
 // --- online room ------------------------------------------------------------
 
-function OnlineGame() {
+function OnlineGame({ settings }: { settings: Settings }) {
   const t = useT();
   const net = useOnline(true);
   const [name, setName] = useState(() => net.savedName() || 'Hráč');
@@ -309,13 +328,15 @@ function OnlineGame() {
       {inGame && model !== null ? (
         <>
           {model.result ? <ResultBanner result={model.result} seatName={seatName} /> : null}
-          <Board
-            model={model}
-            play={(move) => {
-              if (net.view) net.move(net.view.seq, move);
-            }}
-          />
-          <Log lines={log} />
+          <div className="stage">
+            <Board
+              model={model}
+              play={(move) => {
+                if (net.view) net.move(net.view.seq, move);
+              }}
+            />
+            {settings.showLog ? <Log lines={log} /> : null}
+          </div>
         </>
       ) : null}
     </>

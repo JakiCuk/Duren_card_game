@@ -1,8 +1,8 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useState, type CSSProperties } from 'react';
 import { cardCode, rankOf, suitOf, type CardId, type Move, type Seat } from '../../engine/index.js';
 import { CardBackStack, CardFace } from '../cards/CardFace.js';
-import { useT } from '../i18n/index.js';
-import type { BoardModel } from './model.js';
+import { useT, type Translate } from '../i18n/index.js';
+import type { BoardModel, BoardSeat } from './model.js';
 
 const SUIT_GLYPH = ['♣', '♦', '♥', '♠'] as const;
 const SUIT_KEY = ['suit.clubs', 'suit.diamonds', 'suit.hearts', 'suit.spades'] as const;
@@ -10,18 +10,26 @@ const SUIT_KEY = ['suit.clubs', 'suit.diamonds', 'suit.hearts', 'suit.spades'] a
 export interface BoardProps {
   model: BoardModel;
   play: (move: Move) => void;
+  /** True while this player could still add a card, so the table can say so. */
+  awaitingThrowIn?: boolean;
 }
 
-/** Presentation only: it never asks where the model came from. */
-export function Board({ model, play }: BoardProps) {
+/**
+ * A round table seen from your own chair.
+ *
+ * Everything sits where it would if you pulled up a seat: your hand along the
+ * bottom edge, the other players around the far side, the pile in the middle,
+ * and the buttons that act on it directly underneath. Whoever you are playing
+ * rotates to the bottom, so the layout never asks you to work out which of six
+ * panels is yours.
+ */
+export function Board({ model, play, awaitingThrowIn = false }: BoardProps) {
   const t = useT();
   const [seat, setSeat] = useState<Seat>(model.controllable[0] ?? 0);
   const [slot, setSlot] = useState(0);
 
-  const firstUnbeaten = model.table.findIndex((t) => t.defence === null);
+  const firstUnbeaten = model.table.findIndex((x) => x.defence === null);
 
-  // Keep the active seat on somebody this client may act for, and keep the
-  // defence target on a slot that still needs covering.
   useEffect(() => {
     if (model.controllable.length > 0 && !model.controllable.includes(seat)) {
       setSeat(model.controllable[0]!);
@@ -48,11 +56,14 @@ export function Board({ model, play }: BoardProps) {
 
   const takeMove = moves.find((m) => m.t === 'TAKE');
   const passMove = moves.find((m) => m.t === 'PASS');
-  // Transfers get their own buttons rather than lighting up a card: the same
-  // card is often both a legal defence and a legal transfer, so a click on it
-  // would be ambiguous.
   const transfers = moves.filter((m) => m.t === 'TRANSFER');
 
+  const meIndex = Math.max(
+    model.seats.findIndex((p) => p.seat === seat),
+    0,
+  );
+  const me = model.seats[meIndex]!;
+  const others = rotate(model.seats, meIndex).slice(1);
   const seatName = (s: Seat): string =>
     model.seats.find((x) => x.seat === s)?.name ?? t('player.seat', { n: s + 1 });
 
@@ -70,8 +81,12 @@ export function Board({ model, play }: BoardProps) {
         <span className="chip">{t('board.discard', { n: model.discardCount })}</span>
       </div>
 
-      <div className="board__middle">
-        <div className="deck">
+      <div className="felt">
+        {others.map((p, i) => (
+          <Opponent key={p.seat} player={p} model={model} style={seatPosition(i + 1, model.seats.length)} />
+        ))}
+
+        <div className="felt__deck">
           {model.deckCount > 0 ? (
             <>
               {model.trumpCard !== null ? (
@@ -86,144 +101,210 @@ export function Board({ model, play }: BoardProps) {
           )}
         </div>
 
-        <div className="table" aria-label={t('board.table')}>
-          {model.table.length === 0 ? (
-            <p className="table__hint">
-              {model.finished
-                ? t('board.gameOver')
-                : t('board.attacks', { name: seatName(model.attackerSeat) })}
-            </p>
-          ) : (
-            model.table.map((pair, i) => (
-              <div
-                key={`${pair.attack}-${i}`}
-                className={`pair${i === slot && pair.defence === null ? ' pair--target' : ''}`}
+        <div className="felt__centre">
+          <div className="table" aria-label={t('board.table')}>
+            {model.table.length === 0 ? (
+              <p className="table__hint">
+                {model.finished
+                  ? t('board.gameOver')
+                  : t('board.attacks', { name: seatName(model.attackerSeat) })}
+              </p>
+            ) : (
+              model.table.map((pair, i) => (
+                <div
+                  key={`${pair.attack}-${i}`}
+                  className={`pair${i === slot && pair.defence === null ? ' pair--target' : ''}`}
+                >
+                  <CardFace
+                    card={pair.attack}
+                    size="md"
+                    {...(pair.defence === null && isDefender ? { onClick: () => setSlot(i) } : {})}
+                    title={pair.defence === null ? t('board.unbeatenHint') : cardCode(pair.attack)}
+                  />
+                  {pair.defence !== null ? (
+                    <span className="pair__defence">
+                      <CardFace card={pair.defence} size="md" />
+                    </span>
+                  ) : null}
+                </div>
+              ))
+            )}
+          </div>
+
+          <div className="actions">
+            {takeMove ? (
+              <button type="button" className="btn btn--warn" onClick={() => play(takeMove)}>
+                {t('action.take')}
+              </button>
+            ) : null}
+            {transfers.map((m) => (
+              <button
+                key={`${m.card}-${String(m.reveal)}`}
+                type="button"
+                className="btn"
+                onClick={() => play(m)}
+                title={m.reveal ? t('rules.reveal.hint') : t('rules.transfer.hint')}
               >
-                <CardFace
-                  card={pair.attack}
-                  size="md"
-                  {...(pair.defence === null && isDefender ? { onClick: () => setSlot(i) } : {})}
-                  title={
-                    pair.defence === null ? t('board.unbeatenHint') : cardCode(pair.attack)
-                  }
-                />
-                {pair.defence !== null ? (
-                  <span className="pair__defence">
-                    <CardFace card={pair.defence} size="md" />
-                  </span>
-                ) : null}
-              </div>
-            ))
-          )}
+                {m.reveal
+                  ? t('action.transferReveal', { card: cardCode(m.card) })
+                  : t('action.transfer', { card: cardCode(m.card) })}
+              </button>
+            ))}
+            {passMove ? (
+              <button
+                type="button"
+                className={`btn${awaitingThrowIn ? ' btn--primary' : ''}`}
+                onClick={() => play(passMove)}
+              >
+                {t('action.pass')}
+              </button>
+            ) : null}
+            {model.controllable
+              .filter((s) => s !== seat)
+              .map((s) => (
+                <button key={s} type="button" className="btn btn--ghost" onClick={() => setSeat(s)}>
+                  {t('action.switchTo', { name: seatName(s) })}
+                </button>
+              ))}
+          </div>
+
+          <p className={`felt__prompt${awaitingThrowIn ? ' felt__prompt--wait' : ''}`}>
+            {awaitingThrowIn
+              ? t('board.yourThrowIn')
+              : model.controllable.length === 0 && !model.finished
+                ? t('board.waiting')
+                : ' '}
+          </p>
         </div>
       </div>
 
-      <div className="seats">
-        {model.seats.map((p) => {
-          const canAct = model.actors.includes(p.seat);
-          const mine = model.controllable.includes(p.seat);
-          const roles: string[] = [];
-          if (p.isBot) roles.push(t('role.bot'));
-          if (!p.connected) roles.push(t('role.away'));
-          if (p.substituted) roles.push(t('role.substituted'));
-          if (p.seat === model.attackerSeat) roles.push(t('role.attacks'));
-          if (p.seat === model.defenderSeat) {
-            roles.push(model.defenderTaking ? t('role.takes') : t('role.defends'));
-          }
-          if (p.out) roles.push(t('role.out'));
-          else if (p.passed) roles.push(t('role.passed'));
-
-          return (
-            <section
-              key={p.seat}
-              aria-label={p.name}
-              className={`seat${p.seat === seat && mine ? ' seat--active' : ''}${canAct ? ' seat--can-act' : ''}${p.connected ? '' : ' seat--away'}${p.team === null ? '' : ` seat--team${p.team}`}`}
-            >
-              <header className="seat__head">
-                <button
-                  type="button"
-                  className="seat__name"
-                  onClick={() => setSeat(p.seat)}
-                  disabled={!mine}
-                  title={mine ? t('board.switchHint') : t('board.notYours')}
-                >
-                  {p.name}
-                </button>
-                {p.team === null ? null : (
-                  <span className="seat__team">{t('team.name', { n: p.team + 1 })}</span>
-                )}
-                <span className="seat__roles">{roles.join(' · ') || ' '}</span>
-                <span className="seat__count">{t('board.cards', { count: p.handCount })}</span>
-              </header>
-
-              <div className="hand">
-                {p.hand === null
-                  ? // Somebody else's cards must never reach the DOM, not even as
-                    // an alt attribute — otherwise hidden information is a lie
-                    // anyone can check with dev tools.
-                    Array.from({ length: p.handCount }, (_, i) => (
-                      <CardFace key={i} card={0} faceDown size="md" />
-                    ))
-                  : sortForDisplay(p.hand, model.trump).map((cardId) => {
-                      const move = p.seat === seat ? playableCards.get(cardId) : undefined;
-                      return (
-                        <CardFace
-                          key={cardId}
-                          card={cardId}
-                          size="md"
-                          muted={p.seat === seat && move === undefined && canAct}
-                          {...(move ? { onClick: () => play(move) } : {})}
-                        />
-                      );
-                    })}
-                {p.handCount === 0 ? <span className="hand__empty">{t('board.noCards')}</span> : null}
-              </div>
-            </section>
-          );
-        })}
-      </div>
-
-      <div className="actions">
-        {takeMove ? (
-          <button type="button" className="btn btn--warn" onClick={() => play(takeMove)}>
-            {t('action.take')}
-          </button>
-        ) : null}
-        {transfers.map((m) => (
-          <button
-            key={`${m.card}-${String(m.reveal)}`}
-            type="button"
-            className="btn"
-            onClick={() => play(m)}
-            title={m.reveal ? t('rules.reveal.hint') : t('rules.transfer.hint')}
-          >
-            {m.reveal
-              ? t('action.transferReveal', { card: cardCode(m.card) })
-              : t('action.transfer', { card: cardCode(m.card) })}
-          </button>
-        ))}
-        {passMove ? (
-          <button type="button" className="btn" onClick={() => play(passMove)}>
-            {t('action.pass')}
-          </button>
-        ) : null}
-        {model.controllable
-          .filter((s) => s !== seat)
-          .map((s) => (
-            <button key={s} type="button" className="btn btn--ghost" onClick={() => setSeat(s)}>
-              {t('action.switchTo', { name: seatName(s) })}
-            </button>
-          ))}
-        {model.controllable.length > 1 ? (
-          <span className="actions__note">{t('board.manyActors')}</span>
-        ) : null}
-        {model.controllable.length === 0 && !model.finished ? (
-          <span className="actions__note">{t('board.waiting')}</span>
-        ) : null}
-      </div>
+      <Me player={me} model={model} playable={playableCards} play={play} />
     </div>
   );
 }
+
+/** Somebody sitting across the table: a name plate and a fan of backs. */
+function Opponent({
+  player,
+  model,
+  style,
+}: {
+  player: BoardSeat;
+  model: BoardModel;
+  style: CSSProperties;
+}) {
+  const t = useT();
+  return (
+    <section
+      aria-label={player.name}
+      className={`seat seat--across${roleClasses(player, model)}`}
+      style={style}
+    >
+      <header className="seat__head">
+        <span className="seat__name">{player.name}</span>
+        {player.team === null ? null : (
+          <span className="seat__team">{t('team.name', { n: player.team + 1 })}</span>
+        )}
+        <span className="seat__count">{t('board.cards', { count: player.handCount })}</span>
+      </header>
+      <span className="seat__roles">{roleLabels(player, model, t).join(' · ') || ' '}</span>
+      <div className="hand hand--fan">
+        {player.hand === null
+          ? // Somebody else's cards must never reach the DOM, not even as an alt
+            // attribute. The fan is capped so a nine-card hand does not sprawl.
+            Array.from({ length: Math.min(player.handCount, 8) }, (_, i) => (
+              <CardFace key={i} card={0} faceDown size="sm" />
+            ))
+          : player.hand.map((c) => <CardFace key={c} card={c} size="sm" />)}
+        {player.handCount === 0 ? <span className="hand__empty">{t('board.noCards')}</span> : null}
+      </div>
+    </section>
+  );
+}
+
+/** The near edge of the table: your own hand, large and clickable. */
+function Me({
+  player,
+  model,
+  playable,
+  play,
+}: {
+  player: BoardSeat;
+  model: BoardModel;
+  playable: Map<CardId, Move>;
+  play: (move: Move) => void;
+}) {
+  const t = useT();
+  const canAct = model.actors.includes(player.seat);
+
+  return (
+    <section aria-label={player.name} className={`seat seat--me${roleClasses(player, model)}`}>
+      <header className="seat__head">
+        <span className="seat__name">{player.name}</span>
+        {player.team === null ? null : (
+          <span className="seat__team">{t('team.name', { n: player.team + 1 })}</span>
+        )}
+        <span className="seat__roles">{roleLabels(player, model, t).join(' · ') || ' '}</span>
+        <span className="seat__count">{t('board.cards', { count: player.handCount })}</span>
+      </header>
+
+      <div className="hand">
+        {player.hand === null
+          ? Array.from({ length: player.handCount }, (_, i) => (
+              <CardFace key={i} card={0} faceDown size="md" />
+            ))
+          : sortForDisplay(player.hand, model.trump).map((cardId) => {
+              const move = playable.get(cardId);
+              return (
+                <CardFace
+                  key={cardId}
+                  card={cardId}
+                  size="md"
+                  muted={move === undefined && canAct}
+                  {...(move ? { onClick: () => play(move) } : {})}
+                />
+              );
+            })}
+        {player.handCount === 0 ? <span className="hand__empty">{t('board.noCards')}</span> : null}
+      </div>
+    </section>
+  );
+}
+
+function roleLabels(p: BoardSeat, model: BoardModel, t: Translate): string[] {
+  const roles: string[] = [];
+  if (p.isBot) roles.push(t('role.bot'));
+  if (!p.connected) roles.push(t('role.away'));
+  if (p.substituted) roles.push(t('role.substituted'));
+  if (p.seat === model.attackerSeat) roles.push(t('role.attacks'));
+  if (p.seat === model.defenderSeat) {
+    roles.push(model.defenderTaking ? t('role.takes') : t('role.defends'));
+  }
+  if (p.out) roles.push(t('role.out'));
+  else if (p.passed) roles.push(t('role.passed'));
+  return roles;
+}
+
+const roleClasses = (p: BoardSeat, model: BoardModel): string =>
+  `${model.actors.includes(p.seat) ? ' seat--can-act' : ''}` +
+  `${p.seat === model.attackerSeat ? ' seat--attacker' : ''}` +
+  `${p.seat === model.defenderSeat ? ' seat--defender' : ''}` +
+  `${p.connected ? '' : ' seat--away'}` +
+  `${p.team === null ? '' : ` seat--team${p.team}`}`;
+
+/** Index 0 is always you at the bottom; the rest go round from there. */
+function seatPosition(index: number, total: number): CSSProperties {
+  const angle = Math.PI / 2 + (index * 2 * Math.PI) / total;
+  return {
+    left: `${50 + 41 * Math.cos(angle)}%`,
+    top: `${50 + 40 * Math.sin(angle)}%`,
+  };
+}
+
+const rotate = <T,>(items: readonly T[], by: number): T[] => [
+  ...items.slice(by),
+  ...items.slice(0, by),
+];
 
 /**
  * Display order only: plain suits grouped and ascending, trumps last. The
