@@ -1,10 +1,11 @@
 import { useEffect, useMemo, useState } from 'react';
 import { cardCode, rankOf, suitOf, type CardId, type Move, type Seat } from '../../engine/index.js';
 import { CardBackStack, CardFace } from '../cards/CardFace.js';
+import { useT } from '../i18n/index.js';
 import type { BoardModel } from './model.js';
 
 const SUIT_GLYPH = ['♣', '♦', '♥', '♠'] as const;
-const SUIT_NAME = ['Kríže', 'Kára', 'Srdcia', 'Piky'] as const;
+const SUIT_KEY = ['suit.clubs', 'suit.diamonds', 'suit.hearts', 'suit.spades'] as const;
 
 export interface BoardProps {
   model: BoardModel;
@@ -13,6 +14,7 @@ export interface BoardProps {
 
 /** Presentation only: it never asks where the model came from. */
 export function Board({ model, play }: BoardProps) {
+  const t = useT();
   const [seat, setSeat] = useState<Seat>(model.controllable[0] ?? 0);
   const [slot, setSlot] = useState(0);
 
@@ -52,20 +54,20 @@ export function Board({ model, play }: BoardProps) {
   const transfers = moves.filter((m) => m.t === 'TRANSFER');
 
   const seatName = (s: Seat): string =>
-    model.seats.find((x) => x.seat === s)?.name ?? `Miesto ${s + 1}`;
+    model.seats.find((x) => x.seat === s)?.name ?? t('player.seat', { n: s + 1 });
 
   return (
     <div className="board">
       <div className="board__status">
-        <span className="chip" title={`Tromf: ${SUIT_NAME[model.trump]}`}>
-          Tromf{' '}
+        <span className="chip" title={t('board.trumpIs', { suit: t(SUIT_KEY[model.trump]) })}>
+          {t('board.trump')}{' '}
           <strong className={model.trump === 1 || model.trump === 2 ? 'red' : ''}>
             {SUIT_GLYPH[model.trump]}
           </strong>
         </span>
-        <span className="chip">Kolo {model.boutIndex + 1}</span>
-        <span className="chip">Balík {model.deckCount}</span>
-        <span className="chip">Odhodené {model.discardCount}</span>
+        <span className="chip">{t('board.bout', { n: model.boutIndex + 1 })}</span>
+        <span className="chip">{t('board.deck', { n: model.deckCount })}</span>
+        <span className="chip">{t('board.discard', { n: model.discardCount })}</span>
       </div>
 
       <div className="board__middle">
@@ -74,20 +76,22 @@ export function Board({ model, play }: BoardProps) {
             <>
               {model.trumpCard !== null ? (
                 <span className="deck__trump">
-                  <CardFace card={model.trumpCard} size="sm" title="Tromfová karta na spodku balíka" />
+                  <CardFace card={model.trumpCard} size="sm" title={t('board.trumpCard')} />
                 </span>
               ) : null}
               <CardBackStack count={model.deckCount} size="sm" />
             </>
           ) : (
-            <span className="deck__empty">Balík je prázdny</span>
+            <span className="deck__empty">{t('board.deckEmpty')}</span>
           )}
         </div>
 
-        <div className="table" aria-label="Stôl">
+        <div className="table" aria-label={t('board.table')}>
           {model.table.length === 0 ? (
             <p className="table__hint">
-              {model.finished ? 'Hra skončila.' : `${seatName(model.attackerSeat)} útočí.`}
+              {model.finished
+                ? t('board.gameOver')
+                : t('board.attacks', { name: seatName(model.attackerSeat) })}
             </p>
           ) : (
             model.table.map((pair, i) => (
@@ -100,9 +104,7 @@ export function Board({ model, play }: BoardProps) {
                   size="md"
                   {...(pair.defence === null && isDefender ? { onClick: () => setSlot(i) } : {})}
                   title={
-                    pair.defence === null
-                      ? 'Nezbité — klikni pre voľbu cieľa obrany'
-                      : cardCode(pair.attack)
+                    pair.defence === null ? t('board.unbeatenHint') : cardCode(pair.attack)
                   }
                 />
                 {pair.defence !== null ? (
@@ -121,12 +123,15 @@ export function Board({ model, play }: BoardProps) {
           const canAct = model.actors.includes(p.seat);
           const mine = model.controllable.includes(p.seat);
           const roles: string[] = [];
-          if (p.isBot) roles.push('bot');
-          if (!p.connected) roles.push('odpojený');
-          if (p.seat === model.attackerSeat) roles.push('útočí');
-          if (p.seat === model.defenderSeat) roles.push(model.defenderTaking ? 'berie' : 'bráni');
-          if (p.out) roles.push('vypadol z hry');
-          else if (p.passed) roles.push('pasoval');
+          if (p.isBot) roles.push(t('role.bot'));
+          if (!p.connected) roles.push(t('role.away'));
+          if (p.substituted) roles.push(t('role.substituted'));
+          if (p.seat === model.attackerSeat) roles.push(t('role.attacks'));
+          if (p.seat === model.defenderSeat) {
+            roles.push(model.defenderTaking ? t('role.takes') : t('role.defends'));
+          }
+          if (p.out) roles.push(t('role.out'));
+          else if (p.passed) roles.push(t('role.passed'));
 
           return (
             <section
@@ -140,12 +145,12 @@ export function Board({ model, play }: BoardProps) {
                   className="seat__name"
                   onClick={() => setSeat(p.seat)}
                   disabled={!mine}
-                  title={mine ? 'Prepnúť na tohto hráča' : 'Za toto miesto teraz nehráš'}
+                  title={mine ? t('board.switchHint') : t('board.notYours')}
                 >
                   {p.name}
                 </button>
                 <span className="seat__roles">{roles.join(' · ') || ' '}</span>
-                <span className="seat__count">{p.handCount} kariet</span>
+                <span className="seat__count">{t('board.cards', { count: p.handCount })}</span>
               </header>
 
               <div className="hand">
@@ -168,7 +173,7 @@ export function Board({ model, play }: BoardProps) {
                         />
                       );
                     })}
-                {p.handCount === 0 ? <span className="hand__empty">bez kariet</span> : null}
+                {p.handCount === 0 ? <span className="hand__empty">{t('board.noCards')}</span> : null}
               </div>
             </section>
           );
@@ -178,7 +183,7 @@ export function Board({ model, play }: BoardProps) {
       <div className="actions">
         {takeMove ? (
           <button type="button" className="btn btn--warn" onClick={() => play(takeMove)}>
-            Beriem
+            {t('action.take')}
           </button>
         ) : null}
         {transfers.map((m) => (
@@ -187,33 +192,30 @@ export function Board({ model, play }: BoardProps) {
             type="button"
             className="btn"
             onClick={() => play(m)}
-            title={
-              m.reveal
-                ? 'Ukáž tromf rovnakej hodnoty — karta ti zostane v ruke'
-                : 'Prehoď útok na ďalšieho hráča'
-            }
+            title={m.reveal ? t('rules.reveal.hint') : t('rules.transfer.hint')}
           >
-            Prehodiť {cardCode(m.card)}
-            {m.reveal ? ' (ukázať)' : ''}
+            {m.reveal
+              ? t('action.transferReveal', { card: cardCode(m.card) })
+              : t('action.transfer', { card: cardCode(m.card) })}
           </button>
         ))}
         {passMove ? (
           <button type="button" className="btn" onClick={() => play(passMove)}>
-            Bito / koniec prihadzovania
+            {t('action.pass')}
           </button>
         ) : null}
         {model.controllable
           .filter((s) => s !== seat)
           .map((s) => (
             <button key={s} type="button" className="btn btn--ghost" onClick={() => setSeat(s)}>
-              Prepnúť na {seatName(s)}
+              {t('action.switchTo', { name: seatName(s) })}
             </button>
           ))}
         {model.controllable.length > 1 ? (
-          <span className="actions__note">Konať môže viacero hráčov naraz.</span>
+          <span className="actions__note">{t('board.manyActors')}</span>
         ) : null}
         {model.controllable.length === 0 && !model.finished ? (
-          <span className="actions__note">Čaká sa na ostatných…</span>
+          <span className="actions__note">{t('board.waiting')}</span>
         ) : null}
       </div>
     </div>

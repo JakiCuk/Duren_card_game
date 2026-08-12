@@ -1,10 +1,10 @@
 // @vitest-environment jsdom
-import { cleanup, render, screen, waitFor, within } from '@testing-library/react';
+import { cleanup, screen, waitFor, within } from '@testing-library/react';
 // Named import, not default: under NodeNext resolution the default export of
 // this package does not carry its type.
 import { userEvent } from '@testing-library/user-event';
 import { afterEach, describe, expect, it } from 'vitest';
-import { App } from '../../src/client/App.js';
+import { renderApp } from './render.js';
 
 afterEach(cleanup);
 
@@ -23,7 +23,7 @@ type User = ReturnType<typeof userEvent.setup>;
  * device, so they hand seat 2 back to a person and redeal.
  */
 async function renderHotSeat(user: User): Promise<void> {
-  render(<App />);
+  renderApp();
   await user.selectOptions(screen.getByLabelText('Miesto 2'), 'human');
   await user.click(screen.getByRole('button', { name: 'Nová hra' }));
 }
@@ -179,7 +179,7 @@ describe('hot-seat board', () => {
 
   it('refuses a table the deck cannot supply, and says why', async () => {
     const user = userEvent.setup();
-    render(<App />);
+    renderApp();
 
     await user.selectOptions(screen.getByLabelText('Hráčov'), '6');
     expect(screen.getByText(/nestačí pre 6 hráčov/)).toBeTruthy();
@@ -196,7 +196,7 @@ describe('playing against a bot', () => {
   const seatPanel = (name: string): HTMLElement => screen.getByRole('region', { name });
 
   it('marks the bot seat and keeps its cards face down', () => {
-    render(<App />);
+    renderApp();
     const bot = seatPanel('Hráč 2');
     expect(bot.textContent).toContain('bot');
 
@@ -209,7 +209,7 @@ describe('playing against a bot', () => {
   });
 
   it('does not let a human act for the bot', () => {
-    render(<App />);
+    renderApp();
     expect(within(seatPanel('Hráč 2')).queryByRole('button', { name: /^Prepnúť/ })).toBeNull();
     expect(screen.getByRole('button', { name: 'Hráč 2' }).hasAttribute('disabled')).toBe(true);
     expect(within(seatPanel('Hráč 2')).queryAllByRole('button', { name: /^[2-9TJQKA][CDHS]$/ })).toHaveLength(0);
@@ -217,7 +217,7 @@ describe('playing against a bot', () => {
 
   it('answers on its own without any further clicks', async () => {
     const user = userEvent.setup();
-    render(<App />);
+    renderApp();
 
     // If the human opens, play one card; otherwise the bot opens by itself.
     const mine = playableCards('Hráč 1');
@@ -237,7 +237,7 @@ describe('playing against a bot', () => {
 describe('rules panel', () => {
   it('applies a preset and says which one is active', async () => {
     const user = userEvent.setup();
-    render(<App />);
+    renderApp();
 
     const panel = screen.getByText('Pravidlá').closest('details')!;
     // The name shows up twice by design: as a preset button and as the summary.
@@ -250,14 +250,14 @@ describe('rules panel', () => {
   });
 
   it('greys out sub-options of a rule that is switched off', () => {
-    render(<App />);
+    renderApp();
     const panel = screen.getByText('Pravidlá').closest('details')!;
     expect(within(panel).getByLabelText(/Reťazenie prehodení/).hasAttribute('disabled')).toBe(true);
   });
 
   it('warns about a switch that changes the game more than it looks', async () => {
     const user = userEvent.setup();
-    render(<App />);
+    renderApp();
 
     const panel = screen.getByText('Pravidlá').closest('details')!;
     await user.click(within(panel).getByLabelText(/Obranca musí zbiť/));
@@ -268,7 +268,7 @@ describe('rules panel', () => {
 
   it('turns the transfer rule into a playable move', async () => {
     const user = userEvent.setup();
-    render(<App />);
+    renderApp();
 
     const panel = screen.getByText('Pravidlá').closest('details')!;
     await user.click(within(panel).getByRole('button', { name: 'S prehadzovaním' }));

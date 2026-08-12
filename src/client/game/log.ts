@@ -1,82 +1,104 @@
 import { cardCode, type GameEvent, type PublicEvent } from '../../engine/index.js';
+import type { Translate } from '../i18n/index.js';
 
 const list = (cards: readonly number[]): string => cards.map(cardCode).join(' ');
 
 /**
- * Human-readable line per event, for the hot-seat log. Becomes translation keys
- * once i18n lands; today it is deliberately plain so the engine's behaviour is
- * easy to watch while playing.
+ * One line per event, for the local game where the full record is available.
+ *
+ * Returns `null` for events that should not be shown at all — a forced pass is
+ * engine bookkeeping, and printing it would leak that the player held no
+ * matching rank.
  */
-export function describeEvent(e: GameEvent, name: (seat: number) => string): string | null {
+export function describeEvent(
+  e: GameEvent,
+  t: Translate,
+  name: (seat: number) => string,
+): string | null {
   switch (e.k) {
     case 'dealt':
-      return `Rozdané. Tromfová karta: ${cardCode(e.trumpCard)}.`;
+      return t('log.dealt', { card: cardCode(e.trumpCard) });
     case 'attack':
-      return `${name(e.seat)} ${e.throwIn ? 'prihadzuje' : 'útočí'} ${cardCode(e.card)}.`;
+      return t(e.throwIn ? 'log.throwIn' : 'log.attack', {
+        name: name(e.seat),
+        card: cardCode(e.card),
+      });
     case 'defend':
-      return `${name(e.seat)} zbíja kartou ${cardCode(e.card)}.`;
+      return t('log.defend', { name: name(e.seat), card: cardCode(e.card) });
     case 'transfer':
-      return e.revealed
-        ? `${name(e.seat)} ukazuje ${cardCode(e.card)} a prehadzuje útok na ${name(e.to)}.`
-        : `${name(e.seat)} prehadzuje ${cardCode(e.card)} na ${name(e.to)}.`;
+      return t(e.revealed ? 'log.transferReveal' : 'log.transfer', {
+        name: name(e.seat),
+        card: cardCode(e.card),
+        target: name(e.to),
+      });
     case 'takeDeclared':
-      return `${name(e.seat)} berie.`;
+      return t('log.takeDeclared', { name: name(e.seat) });
     case 'take':
-      return `${name(e.seat)} si berie ${list(e.cards)}.`;
+      return t('log.take', { name: name(e.seat), cards: list(e.cards) });
     case 'pass':
-      // Forced passes are engine bookkeeping, not a decision worth logging —
-      // and showing them would leak that the player held no matching rank.
-      return e.auto ? null : `${name(e.seat)} pasuje.`;
+      return e.auto ? null : t('log.pass', { name: name(e.seat) });
     case 'bito':
-      return `Bito: ${list(e.cards)}.`;
+      return t('log.bito', { cards: list(e.cards) });
     case 'draw':
-      return `${name(e.seat)} dobral ${e.cards.length} kariet.`;
+      return t('log.draw', { name: name(e.seat), count: e.cards.length });
     case 'trumpTaken':
-      return `${name(e.seat)} berie tromfovú kartu ${cardCode(e.card)} — balík je prázdny.`;
+      return t('log.trumpTaken', { name: name(e.seat), card: cardCode(e.card) });
     case 'out':
-      return `${name(e.seat)} sa zbavil kariet.`;
+      return t('log.out', { name: name(e.seat) });
     case 'gameOver':
-      if (e.result.reason === 'stalemate') return 'Patová pozícia — hra sa už nikam neposúvala.';
-      return e.result.durak === null ? 'Remíza — nikto nie je durak.' : `Durak: ${e.result.durak}.`;
+      if (e.result.reason === 'stalemate') return t('log.stalemate');
+      return e.result.durak === null
+        ? t('log.drawGame')
+        : t('log.durak', { name: e.result.durak });
   }
 }
 
-
 /**
- * The same log, but for the redacted events the server sends.
+ * The same log for the redacted events the server sends.
  *
- * Kept separate rather than unified with `describeEvent`: the public event
- * stream is a genuinely different type — a draw carries a count instead of
- * cards, and a deal carries only your own hand.
+ * Kept separate rather than unified: the public stream is a genuinely different
+ * type — a draw carries a count instead of cards, and a deal carries only your
+ * own hand.
  */
-export function describePublicEvent(e: PublicEvent, name: (seat: number) => string): string | null {
+export function describePublicEvent(
+  e: PublicEvent,
+  t: Translate,
+  name: (seat: number) => string,
+): string | null {
   switch (e.k) {
     case 'dealt':
-      return `Rozdané. Tromfová karta: ${cardCode(e.trumpCard)}.`;
+      return t('log.dealt', { card: cardCode(e.trumpCard) });
     case 'attack':
-      return `${name(e.seat)} ${e.throwIn ? 'prihadzuje' : 'útočí'} ${cardCode(e.card)}.`;
+      return t(e.throwIn ? 'log.throwIn' : 'log.attack', {
+        name: name(e.seat),
+        card: cardCode(e.card),
+      });
     case 'defend':
-      return `${name(e.seat)} zbíja kartou ${cardCode(e.card)}.`;
+      return t('log.defend', { name: name(e.seat), card: cardCode(e.card) });
     case 'transfer':
-      return e.revealed
-        ? `${name(e.seat)} ukazuje ${cardCode(e.card)} a prehadzuje útok na ${name(e.to)}.`
-        : `${name(e.seat)} prehadzuje ${cardCode(e.card)} na ${name(e.to)}.`;
+      return t(e.revealed ? 'log.transferReveal' : 'log.transfer', {
+        name: name(e.seat),
+        card: cardCode(e.card),
+        target: name(e.to),
+      });
     case 'takeDeclared':
-      return `${name(e.seat)} berie.`;
+      return t('log.takeDeclared', { name: name(e.seat) });
     case 'take':
-      return `${name(e.seat)} si berie ${list(e.cards)}.`;
+      return t('log.take', { name: name(e.seat), cards: list(e.cards) });
     case 'pass':
-      return `${name(e.seat)} pasuje.`;
+      return t('log.pass', { name: name(e.seat) });
     case 'bito':
-      return `Bito: ${list(e.cards)}.`;
+      return t('log.bito', { cards: list(e.cards) });
     case 'draw':
-      return `${name(e.seat)} dobral ${e.count} kariet.`;
+      return t('log.draw', { name: name(e.seat), count: e.count });
     case 'trumpTaken':
-      return `${name(e.seat)} berie tromfovú kartu ${cardCode(e.card)} — balík je prázdny.`;
+      return t('log.trumpTaken', { name: name(e.seat), card: cardCode(e.card) });
     case 'out':
-      return `${name(e.seat)} sa zbavil kariet.`;
+      return t('log.out', { name: name(e.seat) });
     case 'gameOver':
-      if (e.result.reason === 'stalemate') return 'Patová pozícia — hra sa už nikam neposúvala.';
-      return e.result.durak === null ? 'Remíza — nikto nie je durak.' : `Durak: ${e.result.durak}.`;
+      if (e.result.reason === 'stalemate') return t('log.stalemate');
+      return e.result.durak === null
+        ? t('log.drawGame')
+        : t('log.durak', { name: e.result.durak });
   }
 }

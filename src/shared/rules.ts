@@ -164,25 +164,22 @@ export function validateConfig(config: RuleConfig, players: number): ConfigVerdi
 export const isPlayable = (config: RuleConfig, players: number): boolean =>
   validateConfig(config, players).errors.length === 0;
 
-/** Ready-made setups for the lobby, so nobody has to understand every switch. */
+/**
+ * Ready-made setups for the lobby, so nobody has to understand every switch.
+ * Names and descriptions live in the client's dictionaries, keyed by `id`.
+ */
 export interface RulePreset {
   id: string;
-  name: string;
-  blurb: string;
   config: RuleConfig;
 }
 
 export const PRESETS: RulePreset[] = [
   {
     id: 'classic',
-    name: 'Klasický durak',
-    blurb: '36 kariet, prihadzuje ktokoľvek, obranca môže kedykoľvek vziať.',
     config: DEFAULT_RULES,
   },
   {
     id: 'perevodnoy',
-    name: 'S prehadzovaním',
-    blurb: 'Obranca môže útok prehodiť na ďalšieho hráča kartou rovnakej hodnoty.',
     config: {
       ...DEFAULT_RULES,
       transfer: { enabled: true, withTrumpReveal: false, allowChains: true },
@@ -190,14 +187,10 @@ export const PRESETS: RulePreset[] = [
   },
   {
     id: 'strict',
-    name: 'Prísny',
-    blurb: 'Brať sa dá len keď naozaj niet čím zbiť, prvé kolo je obmedzené.',
     config: { ...DEFAULT_RULES, defenderMustBeatAll: true, firstBoutCapFive: true },
   },
   {
     id: 'big',
-    name: 'Veľký stôl',
-    blurb: '52 kariet pre 5–6 hráčov, útočia len susedia obrancu.',
     config: { ...DEFAULT_RULES, deckSize: 52, attackerScope: 'neighbours' },
   },
 ];

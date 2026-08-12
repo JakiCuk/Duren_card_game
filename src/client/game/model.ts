@@ -24,6 +24,8 @@ export interface BoardSeat {
   isBot: boolean;
   /** `false` renders the seat as away. Always true for bots and hot-seat. */
   connected: boolean;
+  /** A stand-in is playing this seat because nobody came back for it. */
+  substituted: boolean;
 }
 
 /**
@@ -86,6 +88,7 @@ export function modelFromState(state: GameState, opts: LocalModelOptions): Board
       passed: state.passed[p.seat] === true,
       isBot: opts.isBot(p.seat),
       connected: true,
+      substituted: false,
     })),
     actors,
     controllable: actors.filter((s) => !opts.isBot(s)),
@@ -97,6 +100,7 @@ export interface RemoteModelOptions {
   seatName: (seat: Seat) => string;
   isBot: (seat: Seat) => boolean;
   connected: (seat: Seat) => boolean;
+  substituted: (seat: Seat) => boolean;
 }
 
 /**
@@ -135,6 +139,7 @@ export function modelFromView(view: PlayerView, opts: RemoteModelOptions): Board
       passed: p.passed,
       isBot: opts.isBot(p.seat),
       connected: opts.connected(p.seat),
+      substituted: opts.substituted(p.seat),
     })),
     actors: [...(iCanAct && mySeat !== null ? [mySeat] : []), ...others],
     controllable: iCanAct && mySeat !== null ? [mySeat] : [],

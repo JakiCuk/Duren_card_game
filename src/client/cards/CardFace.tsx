@@ -1,4 +1,5 @@
 import { cardCode, type CardId } from '../../engine/index.js';
+import { useT } from '../i18n/index.js';
 import { defaultTheme, type CardTheme } from './assets.js';
 
 export type CardSize = 'sm' | 'md' | 'lg';
@@ -32,8 +33,9 @@ export function CardFace({
   muted = false,
   title,
 }: CardFaceProps) {
+  const t = useT();
   const src = faceDown ? theme.back : theme.card(card);
-  const label = faceDown ? 'Rubová strana' : cardCode(card);
+  const label = faceDown ? t('card.back') : cardCode(card);
   const className = [
     'card',
     `card--${size}`,
@@ -86,9 +88,10 @@ export function CardBackStack({
   size?: CardSize;
   theme?: CardTheme;
 }) {
+  const t = useT();
   const layers = Math.min(count, 4);
   return (
-    <span className={`stack stack--${size}`} aria-label={`${count} kariet v balíku`}>
+    <span className={`stack stack--${size}`} aria-label={t('card.deckOf', { count })}>
       {Array.from({ length: layers }, (_, i) => (
         <img
           key={i}

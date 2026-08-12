@@ -1,11 +1,11 @@
 // @vitest-environment jsdom
-import { cleanup, render, screen, waitFor, within } from '@testing-library/react';
+import { cleanup, screen, waitFor, within } from '@testing-library/react';
 import { userEvent } from '@testing-library/user-event';
 import { afterAll, afterEach, beforeAll, describe, expect, it } from 'vitest';
 import { WebSocket as NodeWebSocket } from 'ws';
 import { buildServerWithHub } from '../../src/server/app.js';
 import { loadConfig } from '../../src/server/config.js';
-import { App } from '../../src/client/App.js';
+import { renderApp } from './render.js';
 
 /**
  * The online client against a real server.
@@ -47,7 +47,7 @@ afterAll(async () => {
 });
 
 const goOnline = async (user: ReturnType<typeof userEvent.setup>) => {
-  render(<App />);
+  renderApp();
   await user.click(screen.getByRole('button', { name: 'Online izba' }));
   await screen.findByText('pripojené', {}, { timeout: 5000 });
 };

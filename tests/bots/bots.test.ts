@@ -71,7 +71,7 @@ describe('bot contract', () => {
   it('advertises only the levels that exist', () => {
     const available = BOT_CATALOGUE.filter((b) => b.available).map((b) => b.level);
     expect(available).toEqual(LEVELS);
-    expect(BOT_CATALOGUE.every((b) => b.name.length > 0 && b.blurb.length > 0)).toBe(true);
+    expect(BOT_CATALOGUE.every((b) => b.nameKey.length > 0 && b.blurbKey.length > 0)).toBe(true);
   });
 });
 

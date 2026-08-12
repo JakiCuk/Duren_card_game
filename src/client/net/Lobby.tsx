@@ -3,6 +3,7 @@ import { BOT_CATALOGUE, type BotLevel } from '../../bots/index.js';
 import type { ChatLine, RoomState } from '../../shared/protocol.js';
 import { MIN_PLAYERS, type RuleConfig } from '../../shared/rules.js';
 import { RulesPanel } from '../game/RulesPanel.js';
+import { useT, type Translate } from '../i18n/index.js';
 
 export interface LobbyProps {
   room: RoomState;
@@ -22,6 +23,7 @@ const shareUrl = (code: string): string =>
   typeof window === 'undefined' ? code : `${window.location.origin}/#/r/${code}`;
 
 export function Lobby(props: LobbyProps) {
+  const t = useT();
   const { room, mySeat, playerId } = props;
   const isHost = room.hostId === playerId;
   const occupied = room.seats.filter((s) => s.kind !== 'empty').length;
@@ -33,11 +35,9 @@ export function Lobby(props: LobbyProps) {
       <header className="lobby__head">
         <div>
           <h2>
-            Izba <code className="code">{room.code}</code>
+            {t('lobby.room')} <code className="code">{room.code}</code>
           </h2>
-          <p className="hint">
-            Pošli tento kód alebo odkaz komukoľvek, kto sa má pridať. Netreba registráciu.
-          </p>
+          <p className="hint">{t('lobby.shareHint')}</p>
         </div>
         <div className="lobby__actions">
           <button
@@ -49,10 +49,10 @@ export function Lobby(props: LobbyProps) {
               setTimeout(() => setCopied(false), 2000);
             }}
           >
-            {copied ? 'Skopírované' : 'Kopírovať odkaz'}
+            {copied ? t('action.copied') : t('action.copyLink')}
           </button>
           <button type="button" className="btn" onClick={props.onLeave}>
-            Opustiť izbu
+            {t('action.leave')}
           </button>
         </div>
       </header>
@@ -65,24 +65,24 @@ export function Lobby(props: LobbyProps) {
             {occupant.kind === 'human' ? (
               <span className="lobby__who">
                 {occupant.name}
-                {room.hostId && seat === room.seats.findIndex((s) => s.kind === 'human' && s.playerId === room.hostId)
-                  ? ' · hostiteľ'
-                  : ''}
-                {seat === mySeat ? ' · ty' : ''}
-                {occupant.connected ? '' : ' · odpojený'}
+                {occupant.playerId === room.hostId ? ` · ${t('lobby.host')}` : ''}
+                {seat === mySeat ? ` · ${t('lobby.you')}` : ''}
+                {occupant.connected ? '' : ` · ${t('role.away')}`}
+                {occupant.substituted ? ` · ${t('role.substituted')}` : ''}
               </span>
             ) : occupant.kind === 'bot' ? (
               <span className="lobby__who">
-                {occupant.name} · {BOT_CATALOGUE.find((b) => b.level === occupant.level)?.name}
+                {occupant.name} ·{' '}
+                {t(BOT_CATALOGUE.find((b) => b.level === occupant.level)?.nameKey ?? '')}
               </span>
             ) : (
-              <span className="lobby__who lobby__who--empty">voľné</span>
+              <span className="lobby__who lobby__who--empty">{t('lobby.free')}</span>
             )}
 
             <span className="lobby__seatActions">
               {occupant.kind === 'empty' && mySeat !== seat ? (
                 <button type="button" className="btn btn--ghost" onClick={() => props.onSeat(seat)}>
-                  Sadnúť si sem
+                  {t('action.sitHere')}
                 </button>
               ) : null}
               {occupant.kind === 'empty' && isHost
@@ -91,16 +91,16 @@ export function Lobby(props: LobbyProps) {
                       key={bot.level}
                       type="button"
                       className="btn btn--ghost"
-                      title={bot.blurb}
+                      title={t(bot.blurbKey)}
                       onClick={() => props.onAddBot(seat, bot.level)}
                     >
-                      + {bot.name}
+                      {t('lobby.addBot', { name: t(bot.nameKey) })}
                     </button>
                   ))
                 : null}
               {occupant.kind === 'bot' && isHost ? (
                 <button type="button" className="btn btn--ghost" onClick={() => props.onRemoveBot(seat)}>
-                  Odobrať
+                  {t('action.removeBot')}
                 </button>
               ) : null}
             </span>
@@ -111,21 +111,25 @@ export function Lobby(props: LobbyProps) {
       {isHost ? (
         <RulesPanel config={room.config} onChange={props.onConfig} />
       ) : (
-        <p className="hint">Pravidlá nastavuje hostiteľ.</p>
+        <p className="hint">{t('lobby.rulesByHost')}</p>
       )}
 
       {room.problems.errors.length > 0 ? (
-        <p className="problem problem--error">{room.problems.errors.map(explainRoom).join(' ')}</p>
+        <p className="problem problem--error">
+          {room.problems.errors.map((c) => explainRoom(c, t)).join(' ')}
+        </p>
       ) : null}
       {room.problems.warnings.length > 0 ? (
-        <p className="problem problem--warn">{room.problems.warnings.map(explainRoom).join(' ')}</p>
+        <p className="problem problem--warn">
+          {room.problems.warnings.map((c) => explainRoom(c, t)).join(' ')}
+        </p>
       ) : null}
 
       <div className="panel__row">
         <button type="button" className="btn btn--primary" disabled={!canStart} onClick={props.onStart}>
-          {room.phase === 'finished' ? 'Odveta' : 'Začať hru'}
+          {room.phase === 'finished' ? t('action.rematch') : t('action.start')}
         </button>
-        {!isHost ? <span className="hint">Hru spúšťa hostiteľ.</span> : null}
+        {!isHost ? <span className="hint">{t('lobby.startByHost')}</span> : null}
       </div>
 
       <Chat lines={props.chat} onSend={props.onChat} />
@@ -134,6 +138,7 @@ export function Lobby(props: LobbyProps) {
 }
 
 export function Chat({ lines, onSend }: { lines: ChatLine[]; onSend: (text: string) => void }) {
+  const t = useT();
   const [text, setText] = useState('');
   return (
     <div className="chat">
@@ -158,30 +163,19 @@ export function Chat({ lines, onSend }: { lines: ChatLine[]; onSend: (text: stri
           value={text}
           maxLength={200}
           onChange={(e) => setText(e.target.value)}
-          placeholder="Napíš niečo…"
-          aria-label="Správa do chatu"
+          placeholder={t('lobby.chatPlaceholder')}
+          aria-label={t('lobby.chatLabel')}
         />
         <button type="submit" className="btn">
-          Poslať
+          {t('action.send')}
         </button>
       </form>
     </div>
   );
 }
 
-function explainRoom(code: string): string {
-  switch (code) {
-    case 'not_enough_players':
-      return 'Na hru treba aspoň dvoch — pridaj hráča alebo bota.';
-    case 'deck_too_small':
-      return 'Balík nestačí pre toľkých hráčov. Prepni na 52 kariet.';
-    case 'deck_barely_sufficient':
-      return 'Po rozdaní zostane veľmi málo kariet.';
-    case 'must_beat_all_changes_the_game':
-      return 'Pravidlo „musí zbiť" berie obrancovi voľbu.';
-    case 'transfer_two_players':
-      return 'Vo dvojici sa prehodený útok vracia späť na útočníka.';
-    default:
-      return code;
-  }
+/** Room problems arrive as codes; the dictionary turns them into sentences. */
+function explainRoom(code: string, t: Translate): string {
+  const message = t(`problem.${code}`);
+  return message === `problem.${code}` ? code : message;
 }

@@ -1,42 +1,43 @@
 import { useMemo, useState } from 'react';
 import { BOT_CATALOGUE, type BotLevel } from '../bots/index.js';
 import type { GameResult } from '../engine/index.js';
-import { DEFAULT_RULES, validateConfig, type RuleConfig } from '../shared/rules.js';
+import { DEFAULT_RULES, validateConfig, type ConfigProblem, type RuleConfig } from '../shared/rules.js';
 import { CLIENT_VERSION } from '../shared/version.js';
 import { Board } from './game/Board.js';
 import { describeEvent, describePublicEvent } from './game/log.js';
 import { modelFromState, modelFromView } from './game/model.js';
 import { RulesPanel } from './game/RulesPanel.js';
 import { defaultSetup, useLocalGame, type LocalGameSetup } from './game/useLocalGame.js';
+import { LanguageSwitch, useI18n, useT, type Translate } from './i18n/index.js';
 import { Lobby } from './net/Lobby.js';
 import { useOnline } from './net/useOnline.js';
 
 type Mode = 'local' | 'online';
 
-const localSeatName = (seat: number): string => `Hráč ${seat + 1}`;
-
 export function App() {
+  const { t } = useI18n();
   const [mode, setMode] = useState<Mode>('local');
 
   return (
     <main className="shell">
       <header className="masthead">
-        <h1>Durak</h1>
+        <h1>{t('app.title')}</h1>
         <nav className="modes">
           <button
             type="button"
             className={`btn${mode === 'local' ? ' btn--on' : ''}`}
             onClick={() => setMode('local')}
           >
-            Na tomto zariadení
+            {t('mode.local')}
           </button>
           <button
             type="button"
             className={`btn${mode === 'online' ? ' btn--on' : ''}`}
             onClick={() => setMode('online')}
           >
-            Online izba
+            {t('mode.online')}
           </button>
+          <LanguageSwitch />
         </nav>
       </header>
 
@@ -45,11 +46,9 @@ export function App() {
       <footer className="footer">
         <span>v{CLIENT_VERSION}</span>
         <span>
-          Karty: SVG Playing Cards od Daniela S. Fowlera (
           <a href="https://tekeye.uk" rel="noreferrer noopener" target="_blank">
-            tekeye.uk
+            {t('app.cardsCredit')}
           </a>
-          ), CC0 / public domain.
         </span>
       </footer>
     </main>
@@ -59,32 +58,38 @@ export function App() {
 // --- on this device ---------------------------------------------------------
 
 function LocalGame() {
+  const t = useT();
+  // A player at the table, not a chair in the setup panel — different words on
+  // purpose, so the two never collide in the UI.
+  const localSeatName = (seat: number): string => t('player.seat', { n: seat + 1 });
   const game = useLocalGame(defaultSetup());
   const [draft, setDraft] = useState<LocalGameSetup>(game.setup);
 
   const verdict = useMemo(() => validateConfig(draft.config, draft.players), [draft]);
   const model = useMemo(
+    // `t` is in the deps because seat names are translated: switching language
+    // has to redraw the board, not just the chrome around it.
     () => modelFromState(game.state, { seatName: localSeatName, isBot: game.isBot }),
-    [game.state, game.isBot],
+    [game.state, game.isBot, t],
   );
 
   const log = useMemo(() => {
     const lines: string[] = [];
     for (const e of game.events) {
-      const line = describeEvent(e, localSeatName);
+      const line = describeEvent(e, t, localSeatName);
       if (line !== null) lines.push(line);
     }
     return lines.slice(-12).reverse();
-  }, [game.events]);
+  }, [game.events, t]);
 
   return (
     <>
-      <p className="lede">Hra proti botom alebo proti sebe na jednom zariadení.</p>
+      <p className="lede">{t('mode.localLede')}</p>
 
       <section className="panel">
         <div className="panel__row">
           <label>
-            Hráčov
+            {t('field.players')}
             <select
               value={draft.players}
               onChange={(e) => {
@@ -102,7 +107,7 @@ function LocalGame() {
           </label>
 
           <label>
-            Balík
+            {t('field.deck')}
             <select
               value={draft.config.deckSize}
               onChange={(e) =>
@@ -112,18 +117,18 @@ function LocalGame() {
                 })
               }
             >
-              <option value={36}>36 kariet</option>
-              <option value={52}>52 kariet</option>
+              <option value={36}>{t('deck.36')}</option>
+              <option value={52}>{t('deck.52')}</option>
             </select>
           </label>
 
           <label>
-            Seed
+            {t('field.seed')}
             <input
               value={draft.seed}
               onChange={(e) => setDraft({ ...draft, seed: e.target.value })}
               size={10}
-              title="Rovnaký seed rozdá rovnaké karty — hra je plne reprodukovateľná."
+              title={t('field.seedHint')}
             />
           </label>
 
@@ -133,17 +138,17 @@ function LocalGame() {
             disabled={verdict.errors.length > 0}
             onClick={() => game.restart(draft)}
           >
-            Nová hra
+            {t('action.newGame')}
           </button>
           <button type="button" className="btn" onClick={game.undo} disabled={!game.canUndo}>
-            Späť
+            {t('action.undo')}
           </button>
         </div>
 
         <div className="panel__row panel__row--seats">
           {Array.from({ length: draft.players }, (_, seat) => (
             <label key={seat}>
-              {`Miesto ${seat + 1}`}
+              {t('field.seat', { n: seat + 1 })}
               <select
                 value={draft.bots[seat] ?? 'human'}
                 onChange={(e) =>
@@ -155,26 +160,30 @@ function LocalGame() {
                   })
                 }
               >
-                <option value="human">Človek</option>
+                <option value="human">{t('seat.human')}</option>
                 {BOT_CATALOGUE.map((bot) => (
                   <option key={bot.level} value={bot.level} disabled={!bot.available}>
-                    {bot.name}
-                    {bot.available ? '' : ' (čoskoro)'}
+                    {t(bot.nameKey)}
+                    {bot.available ? '' : t('seat.soon')}
                   </option>
                 ))}
               </select>
             </label>
           ))}
         </div>
-        <p className="hint">{describeBots(draft.bots.slice(0, draft.players))}</p>
+        <p className="hint">{describeBots(draft.bots.slice(0, draft.players), t)}</p>
 
         <RulesPanel config={draft.config} onChange={(config) => setDraft({ ...draft, config })} />
 
         {verdict.errors.length > 0 ? (
-          <p className="problem problem--error">{verdict.errors.map(explain).join(' ')}</p>
+          <p className="problem problem--error">
+            {verdict.errors.map((p) => explain(p, t)).join(' ')}
+          </p>
         ) : null}
         {verdict.warnings.length > 0 ? (
-          <p className="problem problem--warn">{verdict.warnings.map(explain).join(' ')}</p>
+          <p className="problem problem--warn">
+            {verdict.warnings.map((p) => explain(p, t)).join(' ')}
+          </p>
         ) : null}
       </section>
 
@@ -189,13 +198,14 @@ function LocalGame() {
 // --- online room ------------------------------------------------------------
 
 function OnlineGame() {
+  const t = useT();
   const net = useOnline(true);
   const [name, setName] = useState(() => net.savedName() || 'Hráč');
   const [code, setCode] = useState('');
 
   const seatName = (seat: number): string => {
     const occupant = net.room?.seats[seat];
-    if (occupant === undefined || occupant.kind === 'empty') return `Miesto ${seat + 1}`;
+    if (occupant === undefined || occupant.kind === 'empty') return t('player.seat', { n: seat + 1 });
     return occupant.name;
   };
 
@@ -210,6 +220,10 @@ function OnlineGame() {
               const occupant = net.room?.seats[seat];
               return occupant?.kind === 'human' ? occupant.connected : true;
             },
+            substituted: (seat) => {
+              const occupant = net.room?.seats[seat];
+              return occupant?.kind === 'human' && occupant.substituted;
+            },
           }),
     // `seatName` closes over the room, so the room belongs in the deps.
     [net.view, net.room],
@@ -218,7 +232,7 @@ function OnlineGame() {
   const log = useMemo(() => {
     const lines: string[] = [];
     for (const e of net.events) {
-      const line = describePublicEvent(e, seatName);
+      const line = describePublicEvent(e, t, seatName);
       if (line !== null) lines.push(line);
     }
     return lines.slice(-12).reverse();
@@ -229,13 +243,12 @@ function OnlineGame() {
   return (
     <>
       <p className="lede">
-        Hra so živými hráčmi. Vytvor izbu a pošli kód — netreba účet ani inštaláciu.{' '}
-        <ConnectionBadge state={net.connection} />
+        {t('mode.onlineLede')} <ConnectionBadge state={net.connection} />
       </p>
 
       {net.error !== null ? (
         <p className="problem problem--error" role="alert" onClick={net.clearError}>
-          {explainError(net.error)}
+          {explainError(net.error, t)}
         </p>
       ) : null}
 
@@ -243,7 +256,7 @@ function OnlineGame() {
         <section className="panel">
           <div className="panel__row">
             <label>
-              Tvoje meno
+              {t('field.name')}
               <input value={name} maxLength={20} onChange={(e) => setName(e.target.value)} />
             </label>
             <button
@@ -252,12 +265,12 @@ function OnlineGame() {
               disabled={net.connection !== 'online' || name.trim().length === 0}
               onClick={() => net.createRoom(name.trim(), DEFAULT_RULES)}
             >
-              Vytvoriť izbu
+              {t('action.createRoom')}
             </button>
           </div>
           <div className="panel__row">
             <label>
-              Kód izby
+              {t('field.roomCode')}
               <input
                 value={code}
                 maxLength={5}
@@ -271,7 +284,7 @@ function OnlineGame() {
               disabled={net.connection !== 'online' || code.trim().length !== 5}
               onClick={() => net.joinRoom(code.trim(), name.trim())}
             >
-              Pripojiť sa
+              {t('action.join')}
             </button>
           </div>
         </section>
@@ -310,27 +323,29 @@ function OnlineGame() {
 }
 
 function ConnectionBadge({ state }: { state: 'connecting' | 'online' | 'offline' }) {
-  const label = state === 'online' ? 'pripojené' : state === 'connecting' ? 'pripájam sa…' : 'odpojené';
-  return <span className={`badge badge--${state}`}>{label}</span>;
+  const t = useT();
+  return <span className={`badge badge--${state}`}>{t(`conn.${state}`)}</span>;
 }
 
 // --- shared bits ------------------------------------------------------------
 
 function ResultBanner({ result, seatName }: { result: GameResult; seatName: (seat: number) => string }) {
+  const t = useT();
   const text =
     result.reason === 'stalemate'
-      ? 'Patová pozícia — karty len kolovali dokola, nikto nie je durak.'
+      ? t('banner.stalemate')
       : result.durak === null
-        ? 'Remíza — všetci sa zbavili kariet naraz.'
+        ? t('banner.draw')
         : // Player ids are seat-derived ("p0" locally, "s0" on the server).
-          `Durak je ${seatName(Number(result.durak.replace(/^\D+/, '')))}.`;
+          t('banner.durak', { name: seatName(Number(result.durak.replace(/^\D+/, ''))) });
   return <section className={`banner${result.durak === null ? '' : ' banner--loss'}`}>{text}</section>;
 }
 
 function Log({ lines }: { lines: string[] }) {
+  const t = useT();
   return (
     <section className="log">
-      <h2>Priebeh</h2>
+      <h2>{t('log.title')}</h2>
       <ol>
         {lines.map((line, i) => (
           <li key={`${i}-${line}`}>{line}</li>
@@ -340,73 +355,23 @@ function Log({ lines }: { lines: string[] }) {
   );
 }
 
-function describeBots(bots: readonly (BotLevel | null)[]): string {
+function describeBots(bots: readonly (BotLevel | null)[], t: Translate): string {
   const levels = bots.filter((b): b is BotLevel => b !== null);
-  if (levels.length === 0) return 'Všetky miesta hrajú ľudia na jednom zariadení.';
+  if (levels.length === 0) return t('bots.hint.none');
   return [...new Set(levels)]
     .map((l) => BOT_CATALOGUE.find((b) => b.level === l))
     .filter((b) => b !== undefined)
-    .map((b) => `${b.name} — ${b.blurb}`)
+    .map((b) => `${t(b.nameKey)} — ${t(b.blurbKey)}`)
     .join(' ');
 }
 
-function explainError(code: string): string {
-  switch (code) {
-    case 'room_not_found':
-      return 'Izba s týmto kódom neexistuje. Skontroluj kód.';
-    case 'room_full':
-      return 'Izba je plná.';
-    case 'room_in_progress':
-      return 'V izbe už beží hra.';
-    case 'not_host':
-      return 'Toto môže zmeniť len hostiteľ.';
-    case 'not_enough_players':
-      return 'Na hru treba aspoň dvoch hráčov.';
-    case 'server_full':
-      return 'Server je momentálne plný, skús to o chvíľu.';
-    case 'seat_taken':
-      return 'Toto miesto je už obsadené.';
-    case 'rate_limited':
-      return 'Priveľa akcií naraz, spomaľ trochu.';
-    case 'illegal_move':
-      return 'Tento ťah nie je podľa pravidiel.';
-    case 'protocol_mismatch':
-      return 'Stránka je zastaraná — obnov ju (Ctrl+R).';
-    default:
-      return `Chyba: ${code}`;
-  }
-}
+/** Server error codes and rule warnings share one lookup: code in, sentence out. */
+const explainError = (code: string, t: Translate): string => {
+  const message = t(`error.${code}`);
+  return message === `error.${code}` ? t('error.unknown', { code }) : message;
+};
 
-function explain(problem: { code: string; params?: Record<string, number | string> }): string {
-  const p = problem.params ?? {};
-  switch (problem.code) {
-    case 'deck_too_small':
-      return `${String(p['deckSize'])} kariet nestačí pre ${String(p['players'])} hráčov — treba aspoň ${String(p['needed'])}, aby zostala tromfová karta.`;
-    case 'deck_barely_sufficient':
-      return 'Po rozdaní zostane v balíku veľmi málo kariet, koncovka príde takmer hneď.';
-    case 'players_out_of_range':
-      return `Počet hráčov musí byť ${String(p['min'])} až ${String(p['max'])}.`;
-    case 'hand_size_out_of_range':
-      return 'Nepodporovaná veľkosť ruky.';
-    case 'max_table_slots_out_of_range':
-      return 'Nepodporovaný limit kariet na stole.';
-    case 'first_bout_cap_meaningless':
-      return 'Obmedzenie prvého kola nedáva pri takto malej ruke zmysel.';
-    case 'attack_cap_out_of_range':
-      return 'Nepodporovaný limit útoku.';
-    case 'scope_has_no_effect':
-      return 'Pri tomto počte hráčov je obrancov sused každý — voľba nič nemení.';
-    case 'transfer_options_without_transfer':
-      return 'Podvoľby prehadzovania nič nerobia, kým je samotné prehadzovanie vypnuté.';
-    case 'transfer_two_players':
-      return 'Vo dvojici sa útok prehodením vracia späť na útočníka — hra je tým divokejšia.';
-    case 'must_beat_all_changes_the_game':
-      return 'Pravidlo „musí zbiť" berie obrancovi voľbu a výrazne pomáha počítajúcim botom.';
-    case 'must_beat_all_with_unlimited_pile':
-      return 'S neobmedzeným prihadzovaním po „beriem" môžu útočníci obrancu mlieť celú ruku.';
-    default:
-      return problem.code;
-  }
-}
+const explain = (problem: ConfigProblem, t: Translate): string =>
+  t(`problem.${problem.code}`, problem.params ?? {});
 
 export default App;
