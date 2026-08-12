@@ -21,7 +21,7 @@ import { duel } from '../../tools/duel.js';
 import { playBotGame } from '../../tools/sim.js';
 import { makeState } from '../engine/helpers.js';
 
-const LEVELS: BotLevel[] = [1, 2];
+const LEVELS: BotLevel[] = [1, 2, 3];
 
 const viewOf = (spec: Parameters<typeof makeState>[0], seat: Seat): PlayerView =>
   redact(makeState(spec), seat);

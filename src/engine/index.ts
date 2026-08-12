@@ -8,3 +8,4 @@ export * from './view.js';
 export * from './apply.js';
 export * from './hash.js';
 export * from './invariants.js';
+export * from './assemble.js';

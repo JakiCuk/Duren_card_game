@@ -47,13 +47,25 @@ odišla do odhadzovacej kôpky alebo sa zmenšil balík, hra končí patom.
 |---|---|---|
 | 1 | Začiatočník | Najlacnejšia legálna karta, šetrí tromfy, nič si nepamätá. |
 | 2 | Pokročilý | Fázy hry, tromfová ekonomika, rozhodnutie brať/brániť, neplytvá kartami na kolo, ktoré nemôže vyhrať. |
-| 3 | Počtár | *(pripravuje sa)* počíta odhodené karty a hypergeometrické pravdepodobnosti. |
+| 3 | Počtár | Rekonštruuje odhadzovaciu kôpku z event logu, pozná presne karty, ktoré si niekto zobral, počíta hypergeometrické pravdepodobnosti a **koncovku v hre dvoch rieši exaktne minimaxom**. |
 | 4 | Majster | *(pripravuje sa)* model súperovej ruky + cielené blafovanie. |
 
 Bot dostáva **len redigovaný `PlayerView`** — cudzie karty typovo nevidí a ESLint mu
 zakazuje importovať čokoľvek, čo drží `GameState`. Sila sa meria na párovaných
 rozdaniach (každé rozdanie sa hrá dvakrát s prehodenými miestami) s Wilsonovým
-intervalom spoľahlivosti; L2 poráža L1 na **60,2 % [58,5 – 61,8]** zo 4000 hier.
+intervalom spoľahlivosti:
+
+| Súboj | Skóre silnejšieho | 95 % interval | Hier |
+|---|---|---|---|
+| L2 vs L1 | 58,5 % | 55,3 – 61,7 | 1000 |
+| L3 vs L2 | 59,4 % | 56,3 – 62,5 | 1000 |
+
+`pnpm bench` vypíše celú maticu a **skončí nenulovo, ak rebrík nie je monotónny** —
+zlepšenie, ktoré neprekoná dolnú hranicu intervalu, nie je zlepšenie.
+
+Kľúčové pri L3: pri hre dvoch s prázdnym balíkom **nie je čo hádať** — každá karta
+je buď naša, odhodená, na stole, alebo v ruke súpera. Pozícia je konečná hra
+s úplnou informáciou, takže sa dá jednoducho vyriešiť.
 
 ## Produkcia
 

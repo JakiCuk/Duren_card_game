@@ -1,22 +1,27 @@
 import type { Seat } from '../engine/index.js';
 import { createLevel1 } from './level1.js';
 import { createLevel2 } from './level2.js';
+import { createLevel3 } from './level3.js';
 import type { BotFactory, BotLevel, BotPolicy } from './types.js';
 
 export * from './types.js';
 export * from './heuristics.js';
 export { createLevel1 } from './level1.js';
 export { createLevel2 } from './level2.js';
+export { createLevel3 } from './level3.js';
+export { CountingMemory } from './counting.js';
+export { solveEndgame } from './endgame.js';
+export * from './probability.js';
 
 const FACTORIES: Record<BotLevel, BotFactory | null> = {
   1: createLevel1,
   2: createLevel2,
-  3: null, // card counting — later slice
+  3: createLevel3,
   4: null, // opponent modelling and bluffing — later slice
 };
 
 /** Highest level implemented so far; requests above it fall back to this. */
-export const MAX_BOT_LEVEL: BotLevel = 2;
+export const MAX_BOT_LEVEL: BotLevel = 3;
 
 export interface BotDescription {
   level: BotLevel;
@@ -29,7 +34,7 @@ export interface BotDescription {
 export const BOT_CATALOGUE: BotDescription[] = [
   { level: 1, nameKey: 'bots.1.name', blurbKey: 'bots.1.blurb', available: true },
   { level: 2, nameKey: 'bots.2.name', blurbKey: 'bots.2.blurb', available: true },
-  { level: 3, nameKey: 'bots.3.name', blurbKey: 'bots.3.blurb', available: false },
+  { level: 3, nameKey: 'bots.3.name', blurbKey: 'bots.3.blurb', available: true },
   { level: 4, nameKey: 'bots.4.name', blurbKey: 'bots.4.blurb', available: false },
 ];
 
