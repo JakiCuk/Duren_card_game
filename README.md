@@ -48,7 +48,7 @@ odišla do odhadzovacej kôpky alebo sa zmenšil balík, hra končí patom.
 | 1 | Začiatočník | Najlacnejšia legálna karta, šetrí tromfy, nič si nepamätá. |
 | 2 | Pokročilý | Fázy hry, tromfová ekonomika, rozhodnutie brať/brániť, neplytvá kartami na kolo, ktoré nemôže vyhrať. |
 | 3 | Počtár | Rekonštruuje odhadzovaciu kôpku z event logu, pozná presne karty, ktoré si niekto zobral, počíta hypergeometrické pravdepodobnosti a **koncovku v hre dvoch rieši exaktne minimaxom**. |
-| 4 | Majster | *(pripravuje sa)* model súperovej ruky + cielené blafovanie. |
+| 4 | Majster | Model súperovej ruky (Sinkhorn nad maticou „kto čo drží"), determinizované PIMC hľadanie a blafovanie s ε-obmedzením. |
 
 Bot dostáva **len redigovaný `PlayerView`** — cudzie karty typovo nevidí a ESLint mu
 zakazuje importovať čokoľvek, čo drží `GameState`. Sila sa meria na párovaných
@@ -59,6 +59,7 @@ intervalom spoľahlivosti:
 |---|---|---|---|
 | L2 vs L1 | 58,5 % | 55,3 – 61,7 | 1000 |
 | L3 vs L2 | 59,4 % | 56,3 – 62,5 | 1000 |
+| L4 vs L3 | 61,5 % | 57,1 – 65,8 | 500 |
 
 `pnpm bench` vypíše celú maticu a **skončí nenulovo, ak rebrík nie je monotónny** —
 zlepšenie, ktoré neprekoná dolnú hranicu intervalu, nie je zlepšenie.
@@ -66,6 +67,17 @@ zlepšenie, ktoré neprekoná dolnú hranicu intervalu, nie je zlepšenie.
 Kľúčové pri L3: pri hre dvoch s prázdnym balíkom **nie je čo hádať** — každá karta
 je buď naša, odhodená, na stole, alebo v ruke súpera. Pozícia je konečná hra
 s úplnou informáciou, takže sa dá jednoducho vyriešiť.
+
+Pri L4 rozhoduje **počet vzoriek**: 8 determinizácií dá 34 %, 18 dá 51 %, 64 dá 66 %.
+Pod tou hranicou hľadanie neváži ťahy, ale meria vlastný šum. Horizont 4 je *horší*
+než 2 — to je známa patológia PIMC (strategy fusion) presne tam, kde ju literatúra
+predpovedá.
+
+**Blafovanie je poctivo zmerané:** proti botovi, ktorý o nás nič neodvodzuje,
+neprináša nič (66,5 % s ním, 65,8 % bez neho — v šume). Váha 0,5 už stojí šesť bodov.
+Preto je nastavené na 0,2 a s ε-obmedzením: blafuje sa len vtedy, keď je to takmer
+zadarmo. Proti človeku, ktorý závery robí, by to malo znamenať viac — to sa ale
+botom zmerať nedá.
 
 ## Produkcia
 

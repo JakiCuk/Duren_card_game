@@ -21,7 +21,7 @@ import { duel } from '../../tools/duel.js';
 import { playBotGame } from '../../tools/sim.js';
 import { makeState } from '../engine/helpers.js';
 
-const LEVELS: BotLevel[] = [1, 2, 3];
+const LEVELS: BotLevel[] = [1, 2, 3, 4];
 
 const viewOf = (spec: Parameters<typeof makeState>[0], seat: Seat): PlayerView =>
   redact(makeState(spec), seat);
@@ -29,14 +29,19 @@ const viewOf = (spec: Parameters<typeof makeState>[0], seat: Seat): PlayerView =
 describe('bot contract', () => {
   it('only ever proposes a move the view already offered', () => {
     for (const level of LEVELS) {
-      for (let seed = 0; seed < 60; seed++) {
+      // Level 4 samples dozens of deals per decision, so it gets fewer games —
+      // the property is the same, the budget is not.
+      const games = level === 4 ? 6 : 60;
+      for (let seed = 0; seed < games; seed++) {
         // playBotGame validates every proposal against the redacted view and
         // throws otherwise, so simply completing the games is the assertion.
         const out = playBotGame({ seed, levels: [level, level], check: seed < 10 });
         expect(out.state.phase).toBe('finished');
       }
     }
-  });
+    // Level 4 plays two full games against itself here; the default 30 s
+    // budget is for cheap tests, not for a search that samples 64 deals a move.
+  }, 180_000);
 
   it('plays legally in three- and four-handed games too', () => {
     for (let seed = 0; seed < 30; seed++) {

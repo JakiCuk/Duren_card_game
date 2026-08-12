@@ -4,6 +4,8 @@ on:
   push:
     branches: [main]
   pull_request:
+  schedule:
+    - cron: '17 3 * * *'
 
 jobs:
   check:
@@ -32,3 +34,18 @@ jobs:
       - run: pnpm sim -- --games 3000 --matrix true --seed 111000
       - run: pnpm sim -- --games 1200 --matrix true --bots 2,1 --seed 222000
       - run: pnpm build
+
+  # The strength ladder is slow (level 4 samples 64 deals per decision), so it
+  # runs on a schedule rather than blocking every pull request.
+  ladder:
+    if: github.event_name == 'schedule'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm bench -- --games 800

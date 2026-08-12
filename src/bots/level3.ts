@@ -1,4 +1,11 @@
-import { rankOf, type CardId, type Move, type PlayerView, type Seat } from '../engine/index.js';
+import {
+  rankOf,
+  type CardId,
+  type Move,
+  type PlayerView,
+  type PublicEvent,
+  type Seat,
+} from '../engine/index.js';
 import { CountingMemory } from './counting.js';
 import { solveEndgame } from './endgame.js';
 import {
@@ -36,20 +43,21 @@ import { NoLegalMoveError, type BotPolicy } from './types.js';
 export function createLevel3(seat: Seat, seed: number | string): BotPolicy {
   const memory = new CountingMemory(seat);
   const fallback = createLevel2(seat, seed);
-  let lastView: PlayerView | null = null;
+  // Events can arrive before any view — the deal itself does. Buffering them
+  // instead of dropping them is the difference between a bot that counts and
+  // one that thinks the game started on its first turn.
+  let pending: PublicEvent[] = [];
 
   return {
     level: 3,
     seat,
     observe(events) {
-      if (lastView !== null) memory.observe(events, lastView);
+      pending.push(...events);
     },
     chooseMove(view: PlayerView): Move {
       if (view.legalMoves.length === 0) throw new NoLegalMoveError(seat);
-      // Events arrive before the view they describe, so the memory is brought
-      // up to date here rather than in `observe`.
-      memory.observe([], view);
-      lastView = view;
+      memory.observe(pending, view);
+      pending = [];
 
       const solved = solveEndgame(view, memory);
       if (solved !== null) return solved.move;
