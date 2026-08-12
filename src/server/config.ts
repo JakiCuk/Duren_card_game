@@ -11,6 +11,10 @@ export interface ServerConfig {
   /** Directory holding the built client. Absent in dev — Vite serves it. */
   clientDir: string | null;
   maxRooms: number;
+  /** How long a room with nobody connected survives before it is closed. */
+  roomIdleMs: number;
+  /** Override for how long bots pause before moving. Unset means the default. */
+  botDelayMs: number | null;
   logLevel: string;
 }
 
@@ -20,6 +24,8 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): ServerConfig {
     port: int(env.PORT, 3000),
     clientDir: env.CLIENT_DIR ?? null,
     maxRooms: int(env.MAX_ROOMS, 500),
+    roomIdleMs: int(env.ROOM_IDLE_MS, 10 * 60 * 1000),
+    botDelayMs: env.BOT_DELAY_MS === undefined ? null : int(env.BOT_DELAY_MS, 0),
     logLevel: env.LOG_LEVEL ?? 'info',
   };
 }
