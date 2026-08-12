@@ -22,9 +22,14 @@ export const renderApp = (locale: Locale = 'sk') =>
     </StrictMode>,
   );
 
-export const renderWithI18n = (node: ReactElement, locale: Locale = 'sk') =>
-  render(
+export const renderWithI18n = (node: ReactElement, locale: Locale = 'sk') => {
+  const wrap = (child: ReactElement) => (
     <StrictMode>
-      <I18nProvider initial={locale}>{node}</I18nProvider>
-    </StrictMode>,
+      <I18nProvider initial={locale}>{child}</I18nProvider>
+    </StrictMode>
   );
+  const result = render(wrap(node));
+  // Testing Library's own `rerender` replaces the whole tree, provider and all,
+  // so anything rendered through it would land outside the context. Re-wrap.
+  return { ...result, rerender: (next: ReactElement) => result.rerender(wrap(next)) };
+};

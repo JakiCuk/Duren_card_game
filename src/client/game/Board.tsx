@@ -27,16 +27,22 @@ export interface BoardProps {
  */
 export function Board({ model, play, awaitingThrowIn = false, showStatus = true }: BoardProps) {
   const t = useT();
-  const [seat, setSeat] = useState<Seat>(model.controllable[0] ?? 0);
+  const [seat, setSeat] = useState<Seat>(model.mySeat ?? model.controllable[0] ?? 0);
   const [slot, setSlot] = useState(0);
 
   const firstUnbeaten = model.table.findIndex((x) => x.defence === null);
 
   useEffect(() => {
+    // Online, the chair is yours and never moves. Hot seat has no fixed owner,
+    // so the table follows whoever can act.
+    if (model.mySeat !== null) {
+      if (seat !== model.mySeat) setSeat(model.mySeat);
+      return;
+    }
     if (model.controllable.length > 0 && !model.controllable.includes(seat)) {
       setSeat(model.controllable[0]!);
     }
-  }, [model.controllable, seat]);
+  }, [model.mySeat, model.controllable, seat]);
   useEffect(() => {
     if (model.table[slot]?.defence !== null) setSlot(firstUnbeaten === -1 ? 0 : firstUnbeaten);
   }, [model.table, slot, firstUnbeaten]);

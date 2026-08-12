@@ -53,6 +53,15 @@ export interface BoardModel {
   finished: boolean;
   result: GameResult | null;
   seats: BoardSeat[];
+  /**
+   * The seat this client belongs to, whatever the turn order says.
+   *
+   * `null` only for hot seat, where the table rotates to whoever is holding the
+   * device. Online it is always set: you keep your chair while you wait, and
+   * anchoring the view on "whoever can move" would seat you somewhere else the
+   * moment it stopped being your turn.
+   */
+  mySeat: Seat | null;
   /** Seats that could act now — used for highlighting, not for permission. */
   actors: Seat[];
   /** Seats this client may actually play for. */
@@ -93,6 +102,7 @@ export function modelFromState(state: GameState, opts: LocalModelOptions): Board
       substituted: false,
       team: state.config.teams === null ? null : ((p.seat % 2) as 0 | 1),
     })),
+    mySeat: null,
     actors,
     controllable: actors.filter((s) => !opts.isBot(s)),
     movesFor: (seat) => (state.phase === 'bout' ? legalMoves(ctxOf(state), seat) : []),
@@ -145,6 +155,7 @@ export function modelFromView(view: PlayerView, opts: RemoteModelOptions): Board
       substituted: opts.substituted(p.seat),
       team: p.team,
     })),
+    mySeat,
     actors: [...(iCanAct && mySeat !== null ? [mySeat] : []), ...others],
     controllable: iCanAct && mySeat !== null ? [mySeat] : [],
     movesFor: (seat) => (seat === mySeat && !view.finished ? legalMoves(viewCtx(view), seat) : []),
