@@ -1,49 +1,39 @@
 import { useEffect, useMemo, useState } from 'react';
-import {
-  cardCode,
-  rankOf,
-  suitOf,
-  type CardId,
-  type GameState,
-  type Move,
-  type Seat,
-} from '../../engine/index.js';
+import { cardCode, rankOf, suitOf, type CardId, type Move, type Seat } from '../../engine/index.js';
 import { CardBackStack, CardFace } from '../cards/CardFace.js';
+import type { BoardModel } from './model.js';
 
 const SUIT_GLYPH = ['♣', '♦', '♥', '♠'] as const;
 const SUIT_NAME = ['Kríže', 'Kára', 'Srdcia', 'Piky'] as const;
 
 export interface BoardProps {
-  state: GameState;
-  actors: Seat[];
-  /** Seats a human may act for; bot seats are never selectable. */
-  humanActors: Seat[];
-  isBot: (seat: Seat) => boolean;
-  movesFor: (seat: Seat) => Move[];
+  model: BoardModel;
   play: (move: Move) => void;
-  seatName: (seat: Seat) => string;
 }
 
-export function Board({ state, actors, humanActors, isBot, movesFor, play, seatName }: BoardProps) {
-  const [seat, setSeat] = useState<Seat>(humanActors[0] ?? 0);
+/** Presentation only: it never asks where the model came from. */
+export function Board({ model, play }: BoardProps) {
+  const [seat, setSeat] = useState<Seat>(model.controllable[0] ?? 0);
   const [slot, setSlot] = useState(0);
 
-  const firstUnbeaten = state.table.findIndex((t) => t.defence === null);
+  const firstUnbeaten = model.table.findIndex((t) => t.defence === null);
 
-  // Keep the active seat on somebody who can actually move, and keep the
+  // Keep the active seat on somebody this client may act for, and keep the
   // defence target on a slot that still needs covering.
   useEffect(() => {
-    if (humanActors.length > 0 && !humanActors.includes(seat)) setSeat(humanActors[0]!);
-  }, [humanActors, seat]);
+    if (model.controllable.length > 0 && !model.controllable.includes(seat)) {
+      setSeat(model.controllable[0]!);
+    }
+  }, [model.controllable, seat]);
   useEffect(() => {
-    if (state.table[slot]?.defence !== null) setSlot(firstUnbeaten === -1 ? 0 : firstUnbeaten);
-  }, [state.table, slot, firstUnbeaten]);
+    if (model.table[slot]?.defence !== null) setSlot(firstUnbeaten === -1 ? 0 : firstUnbeaten);
+  }, [model.table, slot, firstUnbeaten]);
 
   const moves = useMemo(
-    () => (humanActors.includes(seat) ? movesFor(seat) : []),
-    [humanActors, seat, movesFor],
+    () => (model.controllable.includes(seat) ? model.movesFor(seat) : []),
+    [model, seat],
   );
-  const isDefender = seat === state.defender;
+  const isDefender = seat === model.defenderSeat;
 
   const playableCards = useMemo(() => {
     const set = new Map<CardId, Move>();
@@ -57,31 +47,37 @@ export function Board({ state, actors, humanActors, isBot, movesFor, play, seatN
   const takeMove = moves.find((m) => m.t === 'TAKE');
   const passMove = moves.find((m) => m.t === 'PASS');
   // Transfers get their own buttons rather than lighting up a card: the same
-  // card can often be both a legal defence and a legal transfer, and a click on
-  // it would be ambiguous.
+  // card is often both a legal defence and a legal transfer, so a click on it
+  // would be ambiguous.
   const transfers = moves.filter((m) => m.t === 'TRANSFER');
+
+  const seatName = (s: Seat): string =>
+    model.seats.find((x) => x.seat === s)?.name ?? `Miesto ${s + 1}`;
 
   return (
     <div className="board">
       <div className="board__status">
-        <span className="chip" title={`Tromf: ${SUIT_NAME[state.trump]}`}>
-          Tromf <strong className={state.trump === 1 || state.trump === 2 ? 'red' : ''}>{SUIT_GLYPH[state.trump]}</strong>
+        <span className="chip" title={`Tromf: ${SUIT_NAME[model.trump]}`}>
+          Tromf{' '}
+          <strong className={model.trump === 1 || model.trump === 2 ? 'red' : ''}>
+            {SUIT_GLYPH[model.trump]}
+          </strong>
         </span>
-        <span className="chip">Kolo {state.boutIndex + 1}</span>
-        <span className="chip">Balík {state.deck.length}</span>
-        <span className="chip">Odhodené {state.discard.length}</span>
+        <span className="chip">Kolo {model.boutIndex + 1}</span>
+        <span className="chip">Balík {model.deckCount}</span>
+        <span className="chip">Odhodené {model.discardCount}</span>
       </div>
 
       <div className="board__middle">
         <div className="deck">
-          {state.deck.length > 0 ? (
+          {model.deckCount > 0 ? (
             <>
-              {state.trumpCard !== null && state.config.trumpCardVisible ? (
+              {model.trumpCard !== null ? (
                 <span className="deck__trump">
-                  <CardFace card={state.trumpCard} size="sm" title="Tromfová karta na spodku balíka" />
+                  <CardFace card={model.trumpCard} size="sm" title="Tromfová karta na spodku balíka" />
                 </span>
               ) : null}
-              <CardBackStack count={state.deck.length} size="sm" />
+              <CardBackStack count={model.deckCount} size="sm" />
             </>
           ) : (
             <span className="deck__empty">Balík je prázdny</span>
@@ -89,12 +85,12 @@ export function Board({ state, actors, humanActors, isBot, movesFor, play, seatN
         </div>
 
         <div className="table" aria-label="Stôl">
-          {state.table.length === 0 ? (
+          {model.table.length === 0 ? (
             <p className="table__hint">
-              {state.phase === 'finished' ? 'Hra skončila.' : `${seatName(state.attacker)} útočí.`}
+              {model.finished ? 'Hra skončila.' : `${seatName(model.attackerSeat)} útočí.`}
             </p>
           ) : (
-            state.table.map((pair, i) => (
+            model.table.map((pair, i) => (
               <div
                 key={`${pair.attack}-${i}`}
                 className={`pair${i === slot && pair.defence === null ? ' pair--target' : ''}`}
@@ -103,7 +99,11 @@ export function Board({ state, actors, humanActors, isBot, movesFor, play, seatN
                   card={pair.attack}
                   size="md"
                   {...(pair.defence === null && isDefender ? { onClick: () => setSlot(i) } : {})}
-                  title={pair.defence === null ? 'Nezbité — klikni pre voľbu cieľa obrany' : cardCode(pair.attack)}
+                  title={
+                    pair.defence === null
+                      ? 'Nezbité — klikni pre voľbu cieľa obrany'
+                      : cardCode(pair.attack)
+                  }
                 />
                 {pair.defence !== null ? (
                   <span className="pair__defence">
@@ -117,63 +117,58 @@ export function Board({ state, actors, humanActors, isBot, movesFor, play, seatN
       </div>
 
       <div className="seats">
-        {state.players.map((p) => {
-          const canAct = actors.includes(p.seat);
-          const bot = isBot(p.seat);
+        {model.seats.map((p) => {
+          const canAct = model.actors.includes(p.seat);
+          const mine = model.controllable.includes(p.seat);
           const roles: string[] = [];
-          if (bot) roles.push('bot');
-          if (p.seat === state.attacker) roles.push('útočí');
-          if (p.seat === state.defender) roles.push(state.defenderTaking ? 'berie' : 'bráni');
-          if (p.outAtStep !== null) roles.push('vypadol z hry');
-          else if (state.passed[p.seat]) roles.push('pasoval');
+          if (p.isBot) roles.push('bot');
+          if (!p.connected) roles.push('odpojený');
+          if (p.seat === model.attackerSeat) roles.push('útočí');
+          if (p.seat === model.defenderSeat) roles.push(model.defenderTaking ? 'berie' : 'bráni');
+          if (p.out) roles.push('vypadol z hry');
+          else if (p.passed) roles.push('pasoval');
 
           return (
             <section
               key={p.seat}
-              aria-label={seatName(p.seat)}
-              className={`seat${p.seat === seat ? ' seat--active' : ''}${canAct ? ' seat--can-act' : ''}`}
+              aria-label={p.name}
+              className={`seat${p.seat === seat && mine ? ' seat--active' : ''}${canAct ? ' seat--can-act' : ''}${p.connected ? '' : ' seat--away'}`}
             >
               <header className="seat__head">
                 <button
                   type="button"
                   className="seat__name"
                   onClick={() => setSeat(p.seat)}
-                  disabled={!canAct || bot}
-                  title={
-                    bot
-                      ? 'Toto miesto hrá bot'
-                      : canAct
-                        ? 'Prepnúť na tohto hráča'
-                        : 'Tento hráč teraz nie je na ťahu'
-                  }
+                  disabled={!mine}
+                  title={mine ? 'Prepnúť na tohto hráča' : 'Za toto miesto teraz nehráš'}
                 >
-                  {seatName(p.seat)}
+                  {p.name}
                 </button>
-                <span className="seat__roles">{roles.join(' · ') || ' '}</span>
-                <span className="seat__count">{p.hand.length} kariet</span>
+                <span className="seat__roles">{roles.join(' · ') || ' '}</span>
+                <span className="seat__count">{p.handCount} kariet</span>
               </header>
 
               <div className="hand">
-                {bot
-                  ? // A bot's cards must never reach the DOM, not even as an alt
-                    // attribute — otherwise "play against the computer" is a lie
+                {p.hand === null
+                  ? // Somebody else's cards must never reach the DOM, not even as
+                    // an alt attribute — otherwise hidden information is a lie
                     // anyone can check with dev tools.
-                    Array.from({ length: p.hand.length }, (_, i) => (
+                    Array.from({ length: p.handCount }, (_, i) => (
                       <CardFace key={i} card={0} faceDown size="md" />
                     ))
-                  : sortForDisplay(p.hand, state.trump).map((card) => {
-                      const move = p.seat === seat ? playableCards.get(card) : undefined;
+                  : sortForDisplay(p.hand, model.trump).map((cardId) => {
+                      const move = p.seat === seat ? playableCards.get(cardId) : undefined;
                       return (
                         <CardFace
-                          key={card}
-                          card={card}
+                          key={cardId}
+                          card={cardId}
                           size="md"
                           muted={p.seat === seat && move === undefined && canAct}
                           {...(move ? { onClick: () => play(move) } : {})}
                         />
                       );
                     })}
-                {p.hand.length === 0 ? <span className="hand__empty">bez kariet</span> : null}
+                {p.handCount === 0 ? <span className="hand__empty">bez kariet</span> : null}
               </div>
             </section>
           );
@@ -207,18 +202,18 @@ export function Board({ state, actors, humanActors, isBot, movesFor, play, seatN
             Bito / koniec prihadzovania
           </button>
         ) : null}
-        {humanActors
+        {model.controllable
           .filter((s) => s !== seat)
           .map((s) => (
             <button key={s} type="button" className="btn btn--ghost" onClick={() => setSeat(s)}>
               Prepnúť na {seatName(s)}
             </button>
           ))}
-        {humanActors.length > 1 ? (
+        {model.controllable.length > 1 ? (
           <span className="actions__note">Konať môže viacero hráčov naraz.</span>
         ) : null}
-        {humanActors.length === 0 && state.phase === 'bout' ? (
-          <span className="actions__note">Na ťahu je bot…</span>
+        {model.controllable.length === 0 && !model.finished ? (
+          <span className="actions__note">Čaká sa na ostatných…</span>
         ) : null}
       </div>
     </div>

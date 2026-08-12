@@ -190,7 +190,19 @@ export class Hub {
 
       case 'game.move': {
         const room = this.requireRoom(session);
-        this.pushViews(room.play(session.playerId, msg.seq, msg.move));
+        try {
+          this.pushViews(room.play(session.playerId, msg.seq, msg.move));
+        } catch (err) {
+          // A rejected move leaves the client holding a view it can no longer
+          // act on. Sending the current one back turns "your move was refused"
+          // into "here is what actually happened", which is the only useful
+          // thing to say.
+          if (err instanceof RoomError) {
+            const view = room.viewFor(session.playerId);
+            if (view) conn.sink.send({ t: 'game.view', view, events: [] });
+          }
+          throw err;
+        }
         if (room.phase === 'finished') this.sendRoomState(room);
         return;
       }

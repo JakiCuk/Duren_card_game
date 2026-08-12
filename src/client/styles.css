@@ -511,3 +511,159 @@ body {
   border-color: var(--accent);
   color: var(--ink);
 }
+
+/* --- modes, lobby, chat ---------------------------------------------------- */
+
+.masthead {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 1rem;
+  align-items: baseline;
+  justify-content: space-between;
+}
+
+.modes {
+  display: flex;
+  gap: 0.4rem;
+}
+
+.badge {
+  font-size: 0.75rem;
+  border-radius: 999px;
+  padding: 0.1rem 0.55rem;
+  border: 1px solid var(--line);
+}
+
+.badge--online {
+  color: #62c07a;
+  border-color: #2f6b3f;
+}
+
+.badge--connecting {
+  color: var(--accent);
+  border-color: var(--accent);
+}
+
+.badge--offline {
+  color: var(--warn);
+  border-color: var(--warn);
+}
+
+.lobby {
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  padding: 1rem;
+  display: grid;
+  gap: 0.9rem;
+}
+
+.lobby__head {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 1rem;
+  justify-content: space-between;
+  align-items: start;
+}
+
+.lobby h2 {
+  margin: 0;
+  font-size: 1.1rem;
+}
+
+.lobby__actions {
+  display: flex;
+  gap: 0.4rem;
+}
+
+.code {
+  font-size: 1.4rem;
+  letter-spacing: 0.18em;
+  background: var(--surface-2);
+  border: 1px solid var(--accent);
+  border-radius: 6px;
+  padding: 0.1rem 0.5rem;
+  color: var(--accent);
+}
+
+.lobby__seats {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: 0.35rem;
+}
+
+.lobby__seat {
+  display: flex;
+  gap: 0.6rem;
+  align-items: center;
+  flex-wrap: wrap;
+  padding: 0.4rem 0.6rem;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--surface-2);
+}
+
+.lobby__seat--empty {
+  background: none;
+  border-style: dashed;
+}
+
+.lobby__seatNo {
+  color: var(--muted);
+  font-variant-numeric: tabular-nums;
+}
+
+.lobby__who {
+  font-weight: 600;
+  flex: 1;
+}
+
+.lobby__who--empty {
+  font-weight: 400;
+  color: var(--muted);
+}
+
+.lobby__seatActions {
+  display: flex;
+  gap: 0.3rem;
+  flex-wrap: wrap;
+}
+
+.seat--away {
+  opacity: 0.6;
+}
+
+.chat {
+  border-top: 1px solid var(--line);
+  padding-top: 0.6rem;
+  display: grid;
+  gap: 0.4rem;
+}
+
+.chat__lines {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: 0.15rem;
+  font-size: 0.87rem;
+  max-height: 9rem;
+  overflow-y: auto;
+}
+
+.chat__form {
+  display: flex;
+  gap: 0.4rem;
+}
+
+.chat__form input {
+  flex: 1;
+  font: inherit;
+  padding: 0.35rem 0.5rem;
+  border-radius: 6px;
+  border: 1px solid var(--line);
+  background: var(--surface-2);
+  color: var(--ink);
+}

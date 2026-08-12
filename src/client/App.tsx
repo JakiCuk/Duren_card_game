@@ -1,39 +1,85 @@
 import { useMemo, useState } from 'react';
 import { BOT_CATALOGUE, type BotLevel } from '../bots/index.js';
-import { validateConfig, type RuleConfig } from '../shared/rules.js';
+import type { GameResult } from '../engine/index.js';
+import { DEFAULT_RULES, validateConfig, type RuleConfig } from '../shared/rules.js';
 import { CLIENT_VERSION } from '../shared/version.js';
 import { Board } from './game/Board.js';
+import { describeEvent, describePublicEvent } from './game/log.js';
+import { modelFromState, modelFromView } from './game/model.js';
 import { RulesPanel } from './game/RulesPanel.js';
-import { describeEvent } from './game/log.js';
 import { defaultSetup, useLocalGame, type LocalGameSetup } from './game/useLocalGame.js';
+import { Lobby } from './net/Lobby.js';
+import { useOnline } from './net/useOnline.js';
 
-const seatName = (seat: number): string => `Hráč ${seat + 1}`;
+type Mode = 'local' | 'online';
+
+const localSeatName = (seat: number): string => `Hráč ${seat + 1}`;
 
 export function App() {
+  const [mode, setMode] = useState<Mode>('local');
+
+  return (
+    <main className="shell">
+      <header className="masthead">
+        <h1>Durak</h1>
+        <nav className="modes">
+          <button
+            type="button"
+            className={`btn${mode === 'local' ? ' btn--on' : ''}`}
+            onClick={() => setMode('local')}
+          >
+            Na tomto zariadení
+          </button>
+          <button
+            type="button"
+            className={`btn${mode === 'online' ? ' btn--on' : ''}`}
+            onClick={() => setMode('online')}
+          >
+            Online izba
+          </button>
+        </nav>
+      </header>
+
+      {mode === 'local' ? <LocalGame /> : <OnlineGame />}
+
+      <footer className="footer">
+        <span>v{CLIENT_VERSION}</span>
+        <span>
+          Karty: SVG Playing Cards od Daniela S. Fowlera (
+          <a href="https://tekeye.uk" rel="noreferrer noopener" target="_blank">
+            tekeye.uk
+          </a>
+          ), CC0 / public domain.
+        </span>
+      </footer>
+    </main>
+  );
+}
+
+// --- on this device ---------------------------------------------------------
+
+function LocalGame() {
   const game = useLocalGame(defaultSetup());
   const [draft, setDraft] = useState<LocalGameSetup>(game.setup);
 
   const verdict = useMemo(() => validateConfig(draft.config, draft.players), [draft]);
-  const result = game.state.result;
+  const model = useMemo(
+    () => modelFromState(game.state, { seatName: localSeatName, isBot: game.isBot }),
+    [game.state, game.isBot],
+  );
 
   const log = useMemo(() => {
     const lines: string[] = [];
     for (const e of game.events) {
-      const line = describeEvent(e, seatName);
+      const line = describeEvent(e, localSeatName);
       if (line !== null) lines.push(line);
     }
     return lines.slice(-12).reverse();
   }, [game.events]);
 
   return (
-    <main className="shell">
-      <header className="masthead">
-        <h1>Durak</h1>
-        <p className="lede">
-          Hra proti botom alebo proti sebe na jednom zariadení. Online hra so živými hráčmi
-          pribudne v ďalšom kroku.
-        </p>
-      </header>
+    <>
+      <p className="lede">Hra proti botom alebo proti sebe na jednom zariadení.</p>
 
       <section className="panel">
         <div className="panel__row">
@@ -132,57 +178,203 @@ export function App() {
         ) : null}
       </section>
 
-      {result ? (
-        <section className={`banner${result.durak === null ? '' : ' banner--loss'}`}>
-          {result.reason === 'stalemate'
-            ? 'Patová pozícia — karty len kolovali dokola, nikto nie je durak.'
-            : result.durak === null
-              ? 'Remíza — všetci sa zbavili kariet naraz.'
-              : `Durak je ${seatName(Number(result.durak.slice(1)))}.`}
+      {game.state.result ? <ResultBanner result={game.state.result} seatName={localSeatName} /> : null}
+
+      <Board model={model} play={game.play} />
+      <Log lines={log} />
+    </>
+  );
+}
+
+// --- online room ------------------------------------------------------------
+
+function OnlineGame() {
+  const net = useOnline(true);
+  const [name, setName] = useState(() => net.savedName() || 'Hráč');
+  const [code, setCode] = useState('');
+
+  const seatName = (seat: number): string => {
+    const occupant = net.room?.seats[seat];
+    if (occupant === undefined || occupant.kind === 'empty') return `Miesto ${seat + 1}`;
+    return occupant.name;
+  };
+
+  const model = useMemo(
+    () =>
+      net.view === null
+        ? null
+        : modelFromView(net.view, {
+            seatName,
+            isBot: (seat) => net.room?.seats[seat]?.kind === 'bot',
+            connected: (seat) => {
+              const occupant = net.room?.seats[seat];
+              return occupant?.kind === 'human' ? occupant.connected : true;
+            },
+          }),
+    // `seatName` closes over the room, so the room belongs in the deps.
+    [net.view, net.room],
+  );
+
+  const log = useMemo(() => {
+    const lines: string[] = [];
+    for (const e of net.events) {
+      const line = describePublicEvent(e, seatName);
+      if (line !== null) lines.push(line);
+    }
+    return lines.slice(-12).reverse();
+  }, [net.events, net.room]);
+
+  const inGame = net.room !== null && net.room.phase === 'playing' && model !== null;
+
+  return (
+    <>
+      <p className="lede">
+        Hra so živými hráčmi. Vytvor izbu a pošli kód — netreba účet ani inštaláciu.{' '}
+        <ConnectionBadge state={net.connection} />
+      </p>
+
+      {net.error !== null ? (
+        <p className="problem problem--error" role="alert" onClick={net.clearError}>
+          {explainError(net.error)}
+        </p>
+      ) : null}
+
+      {net.room === null ? (
+        <section className="panel">
+          <div className="panel__row">
+            <label>
+              Tvoje meno
+              <input value={name} maxLength={20} onChange={(e) => setName(e.target.value)} />
+            </label>
+            <button
+              type="button"
+              className="btn btn--primary"
+              disabled={net.connection !== 'online' || name.trim().length === 0}
+              onClick={() => net.createRoom(name.trim(), DEFAULT_RULES)}
+            >
+              Vytvoriť izbu
+            </button>
+          </div>
+          <div className="panel__row">
+            <label>
+              Kód izby
+              <input
+                value={code}
+                maxLength={5}
+                placeholder="ABC12"
+                onChange={(e) => setCode(e.target.value.toUpperCase())}
+              />
+            </label>
+            <button
+              type="button"
+              className="btn"
+              disabled={net.connection !== 'online' || code.trim().length !== 5}
+              onClick={() => net.joinRoom(code.trim(), name.trim())}
+            >
+              Pripojiť sa
+            </button>
+          </div>
         </section>
       ) : null}
 
-      <Board
-        state={game.state}
-        actors={game.actors}
-        humanActors={game.humanActors}
-        isBot={game.isBot}
-        movesFor={game.movesFor}
-        play={game.play}
-        seatName={seatName}
-      />
+      {net.room !== null && !inGame ? (
+        <Lobby
+          room={net.room}
+          mySeat={net.mySeat}
+          playerId={net.playerId ?? ''}
+          chat={net.chat}
+          onConfig={net.setConfig}
+          onSeat={net.takeSeat}
+          onAddBot={net.addBot}
+          onRemoveBot={net.removeBot}
+          onStart={net.room.phase === 'finished' ? net.rematch : net.start}
+          onLeave={net.leaveRoom}
+          onChat={net.sendChat}
+        />
+      ) : null}
 
-      <section className="log">
-        <h2>Priebeh</h2>
-        <ol>
-          {log.map((line, i) => (
-            <li key={`${i}-${line}`}>{line}</li>
-          ))}
-        </ol>
-      </section>
+      {inGame && model !== null ? (
+        <>
+          {model.result ? <ResultBanner result={model.result} seatName={seatName} /> : null}
+          <Board
+            model={model}
+            play={(move) => {
+              if (net.view) net.move(net.view.seq, move);
+            }}
+          />
+          <Log lines={log} />
+        </>
+      ) : null}
+    </>
+  );
+}
 
-      <footer className="footer">
-        <span>v{CLIENT_VERSION}</span>
-        <span>
-          Karty: SVG Playing Cards od Daniela S. Fowlera (
-          <a href="https://tekeye.uk" rel="noreferrer noopener" target="_blank">
-            tekeye.uk
-          </a>
-          ), CC0 / public domain.
-        </span>
-      </footer>
-    </main>
+function ConnectionBadge({ state }: { state: 'connecting' | 'online' | 'offline' }) {
+  const label = state === 'online' ? 'pripojené' : state === 'connecting' ? 'pripájam sa…' : 'odpojené';
+  return <span className={`badge badge--${state}`}>{label}</span>;
+}
+
+// --- shared bits ------------------------------------------------------------
+
+function ResultBanner({ result, seatName }: { result: GameResult; seatName: (seat: number) => string }) {
+  const text =
+    result.reason === 'stalemate'
+      ? 'Patová pozícia — karty len kolovali dokola, nikto nie je durak.'
+      : result.durak === null
+        ? 'Remíza — všetci sa zbavili kariet naraz.'
+        : // Player ids are seat-derived ("p0" locally, "s0" on the server).
+          `Durak je ${seatName(Number(result.durak.replace(/^\D+/, '')))}.`;
+  return <section className={`banner${result.durak === null ? '' : ' banner--loss'}`}>{text}</section>;
+}
+
+function Log({ lines }: { lines: string[] }) {
+  return (
+    <section className="log">
+      <h2>Priebeh</h2>
+      <ol>
+        {lines.map((line, i) => (
+          <li key={`${i}-${line}`}>{line}</li>
+        ))}
+      </ol>
+    </section>
   );
 }
 
 function describeBots(bots: readonly (BotLevel | null)[]): string {
   const levels = bots.filter((b): b is BotLevel => b !== null);
   if (levels.length === 0) return 'Všetky miesta hrajú ľudia na jednom zariadení.';
-  const names = [...new Set(levels)]
+  return [...new Set(levels)]
     .map((l) => BOT_CATALOGUE.find((b) => b.level === l))
     .filter((b) => b !== undefined)
-    .map((b) => `${b.name} — ${b.blurb}`);
-  return names.join(' ');
+    .map((b) => `${b.name} — ${b.blurb}`)
+    .join(' ');
+}
+
+function explainError(code: string): string {
+  switch (code) {
+    case 'room_not_found':
+      return 'Izba s týmto kódom neexistuje. Skontroluj kód.';
+    case 'room_full':
+      return 'Izba je plná.';
+    case 'room_in_progress':
+      return 'V izbe už beží hra.';
+    case 'not_host':
+      return 'Toto môže zmeniť len hostiteľ.';
+    case 'not_enough_players':
+      return 'Na hru treba aspoň dvoch hráčov.';
+    case 'server_full':
+      return 'Server je momentálne plný, skús to o chvíľu.';
+    case 'seat_taken':
+      return 'Toto miesto je už obsadené.';
+    case 'rate_limited':
+      return 'Priveľa akcií naraz, spomaľ trochu.';
+    case 'illegal_move':
+      return 'Tento ťah nie je podľa pravidiel.';
+    case 'protocol_mismatch':
+      return 'Stránka je zastaraná — obnov ju (Ctrl+R).';
+    default:
+      return `Chyba: ${code}`;
+  }
 }
 
 function explain(problem: { code: string; params?: Record<string, number | string> }): string {
