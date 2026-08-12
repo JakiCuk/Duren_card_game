@@ -1,8 +1,16 @@
 import { PROTOCOL_VERSION } from '../shared/version.js';
 import { normalizeCode, type C2S, type ChatLine, type S2C } from '../shared/protocol.js';
 import { DEFAULT_RULES } from '../shared/rules.js';
-import type { Room} from './rooms.js';
-import { RoomError, RoomRegistry, realDeps, type RoomDeps, type ViewUpdate } from './rooms.js';
+import type { Room } from './rooms.js';
+import {
+  DEFAULT_POLICY,
+  RoomError,
+  RoomRegistry,
+  realDeps,
+  type RoomDeps,
+  type RoomPolicy,
+  type ViewUpdate,
+} from './rooms.js';
 import { SessionStore, type Session } from './sessions.js';
 
 /** Anything that can receive a frame — a real socket in production, a stub in tests. */
@@ -23,6 +31,7 @@ export interface HubOptions {
   deps?: RoomDeps;
   /** Overrides how long bots pause. Used by tests and by BOT_DELAY_MS. */
   botDelayMs?: number;
+  policy?: RoomPolicy;
   /** Messages per second a single connection may send before being throttled. */
   rateLimit?: number;
 }
@@ -46,7 +55,7 @@ export class Hub {
     const base = options.deps ?? realDeps;
     this.deps =
       options.botDelayMs === undefined ? base : { ...base, thinkingMs: () => options.botDelayMs! };
-    this.rooms = new RoomRegistry(options.maxRooms ?? 500, this.deps);
+    this.rooms = new RoomRegistry(options.maxRooms ?? 500, this.deps, options.policy ?? DEFAULT_POLICY);
     this.sessions = new SessionStore(undefined, this.deps.now);
     this.rateLimit = options.rateLimit ?? 30;
   }
@@ -121,7 +130,7 @@ export class Hub {
       case 'room.create': {
         session.name = msg.name;
         const room = this.rooms.create({ id: session.playerId, name: msg.name }, msg.config);
-        room.onBotUpdates = (updates) => this.pushViews(updates);
+        this.watch(room);
         session.roomCode = room.code;
         this.sendRoomState(room);
         return;
@@ -245,6 +254,22 @@ export class Hub {
     if (conn.recent.length >= this.rateLimit) return true;
     conn.recent.push(now);
     return false;
+  }
+
+  /**
+   * Pushes moves the server made on its own — bot turns and stand-ins — and
+   * re-sends the room whenever the seat list changed, so "a bot is playing for
+   * Katka" reaches the table without anybody having to ask.
+   */
+  private watch(room: Room): void {
+    let seen = room.version;
+    room.onBotUpdates = (updates) => {
+      this.pushViews(updates);
+      if (room.version !== seen) {
+        seen = room.version;
+        this.sendRoomState(room);
+      }
+    };
   }
 
   private requireRoom(session: Session): Room {

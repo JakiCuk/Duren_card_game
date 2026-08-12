@@ -238,10 +238,13 @@ describe('websocket endpoint', () => {
 
     let view = (await client.latest('game.view')).view;
     for (let step = 0; step < 300 && !view.finished; step++) {
+      // Paced like a person: firing 300 moves in a second would (correctly)
+      // trip the server's rate limit.
+      await new Promise((r) => setTimeout(r, 35));
       const move = view.legalMoves[0];
       // With no legal move the only thing to do is wait for the bot's turn.
       if (move) client.send({ t: 'game.move', seq: view.seq, move });
-      view = (await client.latest('game.view', 3000)).view;
+      view = (await client.latest('game.view', 10_000)).view;
     }
 
     expect(view.finished).toBe(true);
@@ -253,5 +256,5 @@ describe('websocket endpoint', () => {
     // Anything else would be a genuine protocol violation.
     const unexpected = client.received.filter((m) => m.t === 'error' && m.code !== 'stale_seq');
     expect(unexpected).toEqual([]);
-  }, 30_000);
+  }, 60_000);
 });

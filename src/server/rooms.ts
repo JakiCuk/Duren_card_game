@@ -73,6 +73,21 @@ export const realDeps: RoomDeps = {
 
 export const defaultThinkingMs = (level: BotLevel): number => 350 + level * 150;
 
+/** Level used when the server has to play for somebody who is not there. */
+const SUBSTITUTE_LEVEL: BotLevel = 2;
+
+export interface RoomPolicy {
+  /**
+   * How long a disconnected player's clock is held before a bot takes over.
+   * Short enough that nobody waits around, long enough to survive a tunnel.
+   */
+  graceMs: number;
+  /** How long a connected player may think before the server moves for them. */
+  turnTimeoutMs: number | null;
+}
+
+export const DEFAULT_POLICY: RoomPolicy = { graceMs: 45_000, turnTimeoutMs: 60_000 };
+
 /**
  * One room: a lobby that becomes a game.
  *
@@ -91,16 +106,26 @@ export class Room {
   private bots = new Map<Seat, BotPolicy>();
   private lastResultReason: GameState['result'] = null;
   private readonly deps: RoomDeps;
-  private botTurnScheduled = false;
+  private readonly policy: RoomPolicy;
+  /** Substitutes for players who left the table, keyed by seat. */
+  private standIns = new Map<Seat, BotPolicy>();
+  private awaySince = new Map<Seat, number>();
+  /** Seats a stand-in has actually taken over, as opposed to merely away. */
+  private standInActive = new Set<Seat>();
+  /** Bumped whenever the seat list changes in a way clients should see. */
+  private seatsVersion = 0;
+  /** The step a turn was scheduled for; a newer step means the timer is stale. */
+  private scheduledForStep: number | null = null;
 
-  constructor(code: string, host: Player, config: RuleConfig, deps: RoomDeps) {
+  constructor(code: string, host: Player, config: RuleConfig, deps: RoomDeps, policy: RoomPolicy = DEFAULT_POLICY) {
     this.code = code;
     this.config = config;
     this.hostId = host.id;
     this.deps = deps;
+    this.policy = policy;
     this.lastActivity = deps.now();
     this.seats = Array.from({ length: MAX_PLAYERS }, emptySeat);
-    this.seats[0] = { kind: 'human', playerId: host.id, name: host.name, connected: true };
+    this.seats[0] = { kind: 'human', playerId: host.id, name: host.name, connected: true, substituted: false };
   }
 
   // --- lobby ---------------------------------------------------------------
@@ -144,7 +169,13 @@ export class Room {
     if (this.phase !== 'lobby') throw new RoomError('room_in_progress');
     const free = this.seats.findIndex((s) => s.kind === 'empty');
     if (free === -1) throw new RoomError('room_full');
-    this.seats[free] = { kind: 'human', playerId: player.id, name: player.name, connected: true };
+    this.seats[free] = {
+      kind: 'human',
+      playerId: player.id,
+      name: player.name,
+      connected: true,
+      substituted: false,
+    };
     return free;
   }
 
@@ -165,7 +196,39 @@ export class Room {
     const seat = this.seatOf(playerId);
     if (seat === null) return;
     const occupant = this.seats[seat];
-    if (occupant?.kind === 'human') this.seats[seat] = { ...occupant, connected };
+    if (occupant?.kind !== 'human') return;
+    this.seats[seat] = { ...occupant, connected };
+
+    if (connected) {
+      // Reclaiming a seat retires the stand-in immediately, even mid-bout.
+      this.awaySince.delete(seat);
+      this.standIns.delete(seat);
+      this.standInActive.delete(seat);
+    } else {
+      this.awaySince.set(seat, this.deps.now());
+    }
+    this.seatsVersion++;
+    this.scheduleAutoTurn();
+  }
+
+  /** Whether a stand-in is currently playing this seat. */
+  substituted(seat: Seat): boolean {
+    return this.standInActive.has(seat);
+  }
+
+  /** Changes clients should be told about, without diffing the whole room. */
+  get version(): number {
+    return this.seatsVersion;
+  }
+
+  private graceExpired(seat: Seat): boolean {
+    const since = this.awaySince.get(seat);
+    return since !== undefined && this.deps.now() - since >= this.policy.graceMs;
+  }
+
+  /** True while at least one human is still watching. Nothing runs otherwise. */
+  private get anyoneWatching(): boolean {
+    return this.humans().some((h) => h.connected);
   }
 
   private promoteHostIfNeeded(): void {
@@ -250,7 +313,7 @@ export class Room {
 
     this.touch();
     const updates = this.broadcast(events);
-    this.scheduleBotTurn();
+    this.scheduleAutoTurn();
     return updates;
   }
 
@@ -266,6 +329,11 @@ export class Room {
     if (seq !== this.state.step) throw new RoomError('stale_seq');
     if (!isLegal(ctxOf(this.state), move)) throw new RoomError('illegal_move');
 
+    // Playing for yourself retires the stand-in the turn clock installed.
+    if (this.standInActive.delete(seat)) {
+      this.standIns.delete(seat);
+      this.seatsVersion++;
+    }
     return this.applyAndBroadcast(move);
   }
 
@@ -283,31 +351,93 @@ export class Room {
     this.lastResultReason = applied.state.result;
     this.touch();
     const updates = this.broadcast(applied.events);
-    this.scheduleBotTurn();
+    this.scheduleAutoTurn();
     return updates;
   }
 
   /**
-   * Bots move one at a time, on a timer, so a table of bots animates instead of
-   * resolving instantly — and so a slow policy can never block the socket.
+   * Decides who, if anyone, the server should move for next.
+   *
+   * Three cases share one path because they are the same problem: a seat that
+   * needs a move and no human at the keyboard. A bot plays its own turn; an
+   * absent player gets a stand-in once their grace period is up; a present
+   * player who never moves gets one after the turn clock runs out.
+   *
+   * Instead of cancelling timers, each one records the step it was armed for
+   * and does nothing if the game has moved on. That is impossible to get wrong,
+   * which cancellation is not.
    */
-  private scheduleBotTurn(): void {
-    if (this.botTurnScheduled || this.state === null || this.state.phase !== 'bout') return;
-    const seat = actorsToAct(this.state).find((s) => this.bots.has(s));
-    if (seat === undefined) return;
+  private scheduleAutoTurn(): void {
+    if (this.state === null || this.state.phase !== 'bout') return;
+    // With nobody watching, a room of bots would burn CPU for an empty table.
+    if (!this.anyoneWatching) return;
 
-    const bot = this.bots.get(seat)!;
-    this.botTurnScheduled = true;
+    const step = this.state.step;
+    if (this.scheduledForStep === step) return;
+
+    const actors = actorsToAct(this.state);
+
+    const botSeat = actors.find((s) => this.bots.has(s));
+    if (botSeat !== undefined) {
+      const bot = this.bots.get(botSeat)!;
+      this.arm(step, botSeat, bot, (this.deps.thinkingMs ?? defaultThinkingMs)(bot.level));
+      return;
+    }
+
+    const awaySeat = actors.find((s) => this.awaySince.has(s));
+    if (awaySeat !== undefined) {
+      const since = this.awaySince.get(awaySeat)!;
+      const delay = Math.max(this.policy.graceMs - (this.deps.now() - since), 0) + 50;
+      this.arm(step, awaySeat, this.standInFor(awaySeat), delay);
+      return;
+    }
+
+    if (this.policy.turnTimeoutMs !== null && actors.length > 0) {
+      const seat = actors[0]!;
+      this.arm(step, seat, this.standInFor(seat), this.policy.turnTimeoutMs);
+    }
+  }
+
+  private standInFor(seat: Seat): BotPolicy {
+    let bot = this.standIns.get(seat);
+    if (!bot) {
+      bot = createBot(SUBSTITUTE_LEVEL, seat, `${this.code}:stand-in:${seat}`);
+      this.standIns.set(seat, bot);
+    }
+    return bot;
+  }
+
+  private arm(step: number, seat: Seat, bot: BotPolicy, delay: number): void {
+    this.scheduledForStep = step;
     this.deps.schedule(() => {
-      this.botTurnScheduled = false;
-      if (this.state === null || this.state.phase !== 'bout') return;
-      if (!actorsToAct(this.state).includes(seat)) {
-        this.scheduleBotTurn();
+      this.scheduledForStep = null;
+      const state = this.state;
+      // Stale timer: somebody already moved, so this one has nothing to say.
+      if (state === null || state.phase !== 'bout' || state.step !== step) {
+        this.scheduleAutoTurn();
         return;
       }
-      const updates = this.applyAndBroadcast(bot.chooseMove(redact(this.state, seat)));
+      if (!actorsToAct(state).includes(seat)) {
+        this.scheduleAutoTurn();
+        return;
+      }
+      if (!this.bots.has(seat)) {
+        const away = this.awaySince.has(seat);
+        // Somebody who came back within grace keeps their turn, and a present
+        // player only loses it once the turn clock has actually run out.
+        if (away && !this.graceExpired(seat)) {
+          this.scheduleAutoTurn();
+          return;
+        }
+        if (!away && this.policy.turnTimeoutMs === null) return;
+        if (!this.standInActive.has(seat)) {
+          this.standInActive.add(seat);
+          this.seatsVersion++;
+        }
+      }
+      const updates = this.applyAndBroadcast(bot.chooseMove(redact(state, seat)));
       this.onBotUpdates?.(updates);
-    }, (this.deps.thinkingMs ?? defaultThinkingMs)(bot.level));
+    }, delay);
   }
 
   /** Set by the socket layer so bot moves reach the wire too. */
@@ -343,6 +473,7 @@ export class Room {
 
   touch(): void {
     this.lastActivity = this.deps.now();
+    this.seatsVersion++;
   }
 
   get connectedHumans(): number {
@@ -357,7 +488,9 @@ export class Room {
       phase: this.phase,
       hostId: this.hostId,
       config: this.config,
-      seats: this.seats.map((s) => ({ ...s })),
+      seats: this.seats.map((s, seat) =>
+        s.kind === 'human' ? { ...s, substituted: this.standInActive.has(seat) } : { ...s },
+      ),
       lastResult: this.lastResultReason,
       problems: {
         errors: players < MIN_PLAYERS
@@ -379,9 +512,12 @@ export class RoomRegistry {
   private readonly deps: RoomDeps;
   private readonly maxRooms: number;
 
-  constructor(maxRooms: number, deps: RoomDeps = realDeps) {
+  private readonly policy: RoomPolicy;
+
+  constructor(maxRooms: number, deps: RoomDeps = realDeps, policy: RoomPolicy = DEFAULT_POLICY) {
     this.maxRooms = maxRooms;
     this.deps = deps;
+    this.policy = policy;
   }
 
   get size(): number {
@@ -390,7 +526,7 @@ export class RoomRegistry {
 
   create(host: Player, config: RuleConfig = DEFAULT_RULES): Room {
     if (this.rooms.size >= this.maxRooms) throw new RoomError('server_full');
-    const room = new Room(this.freshCode(), host, config, this.deps);
+    const room = new Room(this.freshCode(), host, config, this.deps, this.policy);
     this.rooms.set(room.code, room);
     return room;
   }

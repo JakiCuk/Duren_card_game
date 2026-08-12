@@ -83,6 +83,15 @@ export function useOnline(enabled: boolean) {
 
       ws.onmessage = (event: MessageEvent<string>) => {
         const message = JSON.parse(event.data) as S2C;
+        // A refused message leaves us holding a view we can no longer act on.
+        // Asking for a fresh one is the only way back, and it is cheap.
+        if (message.t === 'error' && message.code === 'rate_limited') {
+          window.setTimeout(() => {
+            if (socket.current?.readyState === WebSocket.OPEN) {
+              socket.current.send(JSON.stringify({ t: 'game.resync' } satisfies C2S));
+            }
+          }, 1100);
+        }
         setState((s) => reduce(s, message));
       };
 
@@ -159,6 +168,9 @@ function reduce(state: OnlineState, message: S2C): OnlineState {
       // A stale sequence number is the server telling us to re-render, not a
       // failure worth showing anybody.
       if (message.code === 'stale_seq') return state;
+      // Being throttled is transient: the resync scheduled by the caller will
+      // bring us back in line, so there is nothing to alarm the player with.
+      if (message.code === 'rate_limited') return state;
       return { ...state, error: message.code };
 
     case 'pong':

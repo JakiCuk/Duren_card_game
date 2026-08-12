@@ -37,6 +37,10 @@ export async function buildServerWithHub(config: ServerConfig): Promise<BuiltSer
 
   const hub = new Hub({
     maxRooms: config.maxRooms,
+    policy: {
+      graceMs: config.graceMs,
+      turnTimeoutMs: config.turnTimeoutMs > 0 ? config.turnTimeoutMs : null,
+    },
     ...(config.botDelayMs === null ? {} : { botDelayMs: config.botDelayMs }),
   });
   await registerWebsocket(app, hub);

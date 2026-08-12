@@ -109,7 +109,14 @@ export type ErrorCode = (typeof ERROR_CODES)[number];
 
 export type SeatOccupant =
   | { kind: 'empty' }
-  | { kind: 'human'; playerId: string; name: string; connected: boolean }
+  | {
+      kind: 'human';
+      playerId: string;
+      name: string;
+      connected: boolean;
+      /** The server is playing this seat because nobody came back for it. */
+      substituted: boolean;
+    }
   | { kind: 'bot'; level: 1 | 2 | 3 | 4; name: string };
 
 export interface RoomState {
