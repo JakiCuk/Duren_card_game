@@ -915,6 +915,17 @@ body {
   perspective: 900px;
 }
 
+/* A card played by the move that ended the bout has never been on the table:
+   the engine passes for everyone with nothing to add and resolves the bout in
+   the same step. The pile is held here long enough to read before it leaves. */
+.flight--hold .flight__card {
+  animation: none;
+}
+
+.flight--hold .flight__card--enter {
+  animation: cardIn 0.44s cubic-bezier(0.22, 0.61, 0.36, 1) both;
+}
+
 .flight--bito .flight__card {
   animation: cardBito 0.62s cubic-bezier(0.4, 0, 0.9, 0.6) both;
 }
@@ -924,11 +935,11 @@ body {
    gather it reads as a discard, and without the turn it reads as cards being
    shown to the table rather than picked up. */
 .flight--take .flight__card {
-  animation: cardTake 0.68s cubic-bezier(0.5, 0, 0.4, 1) both;
+  animation: cardTake 0.62s cubic-bezier(0.5, 0, 0.4, 1) both;
 }
 
 .flight--deal .flight__card {
-  animation: cardDeal 0.42s cubic-bezier(0.4, 0, 0.6, 1) both;
+  animation: cardDeal 0.36s cubic-bezier(0.4, 0, 0.6, 1) both;
 }
 
 @keyframes cardBito {

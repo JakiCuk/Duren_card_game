@@ -4,14 +4,17 @@ import {
   rankOf,
   suitOf,
   type CardId,
+  type GameEvent,
   type Move,
+  type PublicEvent,
   type Seat,
-  type TableSlot,
 } from '../../engine/index.js';
 import { CardBackStack, CardFace, stackTopOffset } from '../cards/CardFace.js';
 import { useT, type Translate } from '../i18n/index.js';
 import type { SortBy } from '../settings/useSettings.js';
-import type { BoardModel, BoardSeat } from './model.js';
+import { playedBy, type BoardModel, type BoardSeat } from './model.js';
+
+const EMPTY_EVENTS: readonly (GameEvent | PublicEvent)[] = [];
 
 const SUIT_GLYPH = ['♣', '♦', '♥', '♠'] as const;
 const SUIT_KEY = ['suit.clubs', 'suit.diamonds', 'suit.hearts', 'suit.spades'] as const;
@@ -27,8 +30,13 @@ export interface BoardProps {
   sortBy?: SortBy;
   /** Dim the cards you may not play. Off, the hand is drawn plain. */
   hints?: boolean;
-  /** Who put each card on the table, so it can fly in from the right chair. */
-  playedBy?: ReadonlyMap<CardId, Seat>;
+  /**
+   * Everything that has happened, newest last.
+   *
+   * The board is otherwise handed a position and nothing else, which is enough
+   * to draw the table but not to say who put a card on it or where a bout went.
+   */
+  events?: readonly (GameEvent | PublicEvent)[];
 }
 
 /**
@@ -47,7 +55,7 @@ export function Board({
   showStatus = true,
   sortBy = 'suit',
   hints = true,
-  playedBy,
+  events = EMPTY_EVENTS,
 }: BoardProps) {
   const t = useT();
   const [seat, setSeat] = useState<Seat>(model.mySeat ?? model.controllable[0] ?? 0);
@@ -104,7 +112,8 @@ export function Board({
     return map;
   }, [model.seats, meIndex]);
 
-  const flight = useFlight(model, chairs);
+  const origins = useMemo(() => playedBy(events), [events]);
+  const flight = useFlight(model, chairs, events);
   const prompt = awaitingThrowIn
     ? t('board.yourThrowIn')
     : model.controllable.length === 0 && !model.finished
@@ -147,11 +156,11 @@ export function Board({
             ) : (
               <span className="deck__empty">{t('board.deckEmpty')}</span>
             )}
-            {flight?.from === 'deck' ? <FlightLayer flight={flight} /> : null}
+            {flight !== null && flight.from === 'deck' ? <FlightLayer flight={flight} /> : null}
           </div>
 
           <div className="table" aria-label={t('board.table')}>
-            {model.table.length === 0 ? (
+            {model.table.length === 0 && flight === null ? (
               <p className="table__hint">
                 {model.finished
                   ? t('board.gameOver')
@@ -166,14 +175,14 @@ export function Board({
                   <CardFace
                     card={pair.attack}
                     size="md"
-                    style={originOf(playedBy?.get(pair.attack) ?? model.attackerSeat, chairs)}
+                    style={originOf(origins.get(pair.attack) ?? model.attackerSeat, chairs)}
                     {...(pair.defence === null && isDefender ? { onClick: () => setSlot(i) } : {})}
                     title={pair.defence === null ? t('board.unbeatenHint') : cardCode(pair.attack)}
                   />
                   {pair.defence !== null ? (
                     <span
                       className="pair__defence"
-                      style={originOf(playedBy?.get(pair.defence) ?? model.defenderSeat, chairs)}
+                      style={originOf(origins.get(pair.defence) ?? model.defenderSeat, chairs)}
                     >
                       <CardFace card={pair.defence} size="md" />
                     </span>
@@ -182,7 +191,7 @@ export function Board({
               ))
             )}
 
-            {flight?.from === 'pile' ? <FlightLayer flight={flight} /> : null}
+            {flight !== null && flight.from === 'pile' ? <FlightLayer flight={flight} /> : null}
           </div>
         </div>
       </div>
@@ -251,24 +260,34 @@ export interface FlyingCard {
   faceDown: boolean;
   /** Turns over on the way, e.g. a taken bout going face down into a hand. */
   flips: boolean;
+  /** Lands on the table during a hold instead of sitting still on it. */
+  enters: boolean;
   delay: number;
   /** Where the card starts inside its layer, and where it is heading. */
   place: CSSProperties;
 }
 
-/** A batch of cards leaving the same place at the same moment. */
+/** A batch of cards doing the same thing at the same moment. */
 export interface Flight {
   from: 'pile' | 'deck';
-  /** Scooped up into a hand, swept off to the discard, or dealt out. */
-  mode: 'take' | 'bito' | 'deal';
+  /** Sitting on the table, scooped into a hand, swept to the discard, or dealt. */
+  mode: 'hold' | 'take' | 'bito' | 'deal';
   cards: FlyingCard[];
   /** How long before the next batch may start. */
   duration: number;
 }
 
+/*
+ * Phase lengths, matched by hand to the CSS animations of the same name.
+ *
+ * Kept tight on purpose: a bot's pause is the budget. The whole sequence is
+ * cancelled the moment the next move arrives, because a flight is a picture of
+ * what just happened and showing a stale one would be worse than cutting it.
+ */
+const HOLD_MS = 560;
 const FLY_MS = 620;
-const DEAL_MS = 420;
-const DEAL_GAP = 90;
+const DEAL_MS = 360;
+const DEAL_GAP = 80;
 
 /** Pile geometry in rem, mirroring `.pair` and the `.table` gap. */
 const PAIR_STEP = 7.5;
@@ -291,168 +310,203 @@ const toward = (seat: Seat, chairs: Map<Seat, CSSProperties>): CSSProperties => 
   return { '--tx': x, '--ty': y } as CSSProperties;
 };
 
-/**
- * Which direction a card came from, as an offset the CSS animation starts at.
- *
- * Attacks fly in from the attacker's chair and defences from the defender's.
- * A card thrown in by a third player therefore arrives from the wrong chair —
- * the board is given a position, not a move log, and guessing the thrower from
- * the pile alone would be a guess.
- */
+/** Which direction a card came from, as an offset the CSS animation starts at. */
 function originOf(seat: Seat, chairs: Map<Seat, CSSProperties>): CSSProperties {
   const { x, y } = deltaTo(seat, chairs);
   return { '--fx': x, '--fy': y } as CSSProperties;
 }
 
-/** Everything the flight planner needs to compare one turn against the next. */
-export interface Snapshot {
-  table: TableSlot[];
-  taking: boolean;
-  defender: Seat;
-  attacker: Seat;
-  deckCount: number;
-  trumpCard: CardId | null;
-  hands: Map<Seat, number>;
-  finished: boolean;
-}
+/** A card is only ever a card; the table is what it lands on. */
+type Pile = { attack: CardId; defence: CardId | null }[];
 
-export const snapshot = (model: BoardModel): Snapshot => ({
-  table: model.table,
-  taking: model.defenderTaking,
-  defender: model.defenderSeat,
-  attacker: model.attackerSeat,
-  deckCount: model.deckCount,
-  trumpCard: model.trumpCard,
-  hands: new Map(model.seats.map((p) => [p.seat, p.handCount])),
-  finished: model.finished,
-});
+type BoardEvent = GameEvent | PublicEvent;
 
 /**
- * Works out what moved between two turns, and stages it.
+ * What one move did, read off its events.
  *
- * Cards vanishing between two renders is the one moment where the board stops
- * telling you what happened — you look up and six cards are simply gone, with
- * no way to tell whether the defender took them or they went to the discard.
- * A resolved bout is two events in one move, so they are played in order: the
- * pile empties first, then the deal that follows it.
+ * The board cannot work this out from two positions, and not for want of
+ * trying: the engine auto-passes everyone with nothing to throw in and then
+ * resolves the bout **inside the same move**. So a bot declaring "I take" while
+ * you hold no matching rank never produces a state anybody renders — the take
+ * flag goes up and comes down between two frames. Diffing positions therefore
+ * reported every such bout as beaten, and lost the last card played entirely.
+ */
+interface Step {
+  /** Cards that reached the table this move, and who put them there. */
+  plays: { card: CardId; seat: Seat }[];
+  /** The pile as it stood when the bout ended. */
+  pile: Pile;
+  resolution: { kind: 'take'; seat: Seat } | { kind: 'bito' } | null;
+  /** One entry per card dealt, in the order the engine dealt them. */
+  deals: { seat: Seat; card: CardId | null }[];
+}
+
+export function readStep(before: Pile, events: readonly BoardEvent[]): Step {
+  const pile: Pile = before.map((p) => ({ ...p }));
+  const plays: { card: CardId; seat: Seat }[] = [];
+  const deals: { seat: Seat; card: CardId | null }[] = [];
+  let resolution: Step['resolution'] = null;
+  let trump: { seat: Seat; card: CardId } | null = null;
+
+  for (const e of events) {
+    switch (e.k) {
+      case 'attack':
+      case 'transfer':
+        pile.push({ attack: e.card, defence: null });
+        plays.push({ card: e.card, seat: e.seat });
+        break;
+      case 'defend': {
+        const slot = pile[e.slot];
+        if (slot) slot.defence = e.card;
+        plays.push({ card: e.card, seat: e.seat });
+        break;
+      }
+      case 'take':
+        resolution = { kind: 'take', seat: e.seat };
+        break;
+      case 'bito':
+        resolution = { kind: 'bito' };
+        break;
+      case 'draw': {
+        const count = 'count' in e ? e.count : e.cards.length;
+        for (let i = 0; i < count; i++) deals.push({ seat: e.seat, card: null });
+        break;
+      }
+      case 'trumpTaken':
+        // Emitted alongside the draw that contains it, not instead of it, so it
+        // only names the last card rather than adding one.
+        trump = { seat: e.seat, card: e.card };
+        break;
+      default:
+        break;
+    }
+  }
+
+  const last = deals[deals.length - 1];
+  if (trump !== null && last !== undefined) last.card = trump.card;
+
+  return { plays, pile, resolution, deals };
+}
+
+/**
+ * Stages what a move did, in the order a person would see it happen.
+ *
+ * A card that lands and is swept away in the same move would otherwise never be
+ * on screen at all: the bout is one move to the engine, but three things to
+ * watch. So the pile is held for a beat first, then it leaves, then the deal
+ * that follows it.
  */
 export function planFlights(
-  before: Snapshot,
-  after: Snapshot,
+  before: Pile,
+  events: readonly BoardEvent[],
   chairs: Map<Seat, CSSProperties>,
 ): Flight[] {
+  const step = readStep(before, events);
+  if (step.resolution === null) return [];
+
   const phases: Flight[] = [];
+  const half = (step.pile.length * PAIR_STEP - PAIR_GAP) / 2;
+  const played = new Set(step.plays.map((p) => p.card));
+  const origin = new Map(step.plays.map((p) => [p.card, p.seat]));
 
-  const cleared = before.table.length > 0 && after.table.length === 0;
-  const taken = cleared && before.taking ? before.defender : null;
-  if (cleared) {
-    // The layer redraws the pile where it lay, so the cards set off from the
-    // spot they were lying on rather than from a corner.
-    const half = (before.table.length * PAIR_STEP - PAIR_GAP) / 2;
-    const cards: FlyingCard[] = [];
-    before.table.forEach((pair, p) => {
-      const x = p * PAIR_STEP - half;
-      const target =
-        taken !== null
-          ? toward(taken, chairs)
-          : ({ '--tx': '26vw', '--ty': '-19vh' } as CSSProperties);
-      const at = (dx: number, dy: number): CSSProperties => ({
-        ...target,
-        '--x': `${(x + dx).toFixed(2)}rem`,
-        '--y': `${dy.toFixed(2)}rem`,
-      } as CSSProperties);
-      cards.push({
-        key: `pile-${pair.attack}`,
-        card: pair.attack,
-        faceDown: false,
-        // Taken cards turn over as they go into a hand; a beaten bout stays
-        // face up all the way to the discard, because everyone saw it.
-        flips: taken !== null,
-        delay: 0,
-        place: at(0, 0),
-      });
-      if (pair.defence !== null) {
-        cards.push({
-          key: `pile-${pair.defence}`,
-          card: pair.defence,
-          faceDown: false,
-          flips: taken !== null,
-          delay: 0,
-          place: at(DEFENCE_DX, DEFENCE_DY),
-        });
-      }
-    });
-    phases.push({ from: 'pile', mode: taken !== null ? 'take' : 'bito', duration: FLY_MS, cards });
-  }
-
-  // A hand grows either because its owner took the bout or because they drew.
-  // Only the second is a deal, so the take is subtracted back out.
-  const takenCount = taken === null ? 0 : before.table.reduce((n, p) => n + (p.defence === null ? 1 : 2), 0);
-  // A deal necessarily shrinks the deck. Without this the empty-deck endgame
-  // kept dealing phantom cards to whoever picked a bout up, because a hand
-  // growing was taken as proof that something had been drawn.
-  const dealt = Math.max(before.deckCount - after.deckCount, 0);
-  const drawn: { seat: Seat; count: number }[] = [];
-  if (dealt > 0) {
-    for (const [seat, was] of before.hands) {
-      const now = after.hands.get(seat) ?? was;
-      const count = now - was - (seat === taken ? takenCount : 0);
-      if (count > 0) drawn.push({ seat, count });
+  /** Every card in the pile, with the spot on the table it is lying on. */
+  const laid: { card: CardId; x: number; y: number }[] = [];
+  step.pile.forEach((pair, p) => {
+    laid.push({ card: pair.attack, x: p * PAIR_STEP - half, y: 0 });
+    if (pair.defence !== null) {
+      laid.push({ card: pair.defence, x: p * PAIR_STEP - half + DEFENCE_DX, y: DEFENCE_DY });
     }
+  });
+
+  const at = (x: number, y: number, extra: CSSProperties = {}): CSSProperties =>
+    ({ ...extra, '--x': `${x.toFixed(2)}rem`, '--y': `${y.toFixed(2)}rem` }) as CSSProperties;
+
+  // A card played in the same move that ended the bout has never been drawn on
+  // the table, so the pile is held long enough to read before it goes.
+  if (step.plays.length > 0) {
+    phases.push({
+      from: 'pile',
+      mode: 'hold',
+      duration: HOLD_MS,
+      cards: laid.map((c) => ({
+        key: `hold-${c.card}`,
+        card: c.card,
+        faceDown: false,
+        flips: false,
+        enters: played.has(c.card),
+        delay: 0,
+        place: at(c.x, c.y, originOf(origin.get(c.card) ?? 0, chairs)),
+      })),
+    });
   }
 
-  // The engine deals to the opening attacker first, clockwise from there, and
-  // the defender last. Following that order is what makes the deal readable.
-  const order = [...drawn].sort((a, b) => dealRank(a.seat, before) - dealRank(b.seat, before));
-  const total = Math.min(
-    order.reduce((n, d) => n + d.count, 0),
-    dealt,
-  );
-  if (total > 0) {
-    const cards: FlyingCard[] = [];
-    let i = 0;
-    outer: for (const { seat, count } of order) {
-      for (let n = 0; n < count; n++, i++) {
-        if (i >= total) break outer;
+  const taken = step.resolution.kind === 'take' ? step.resolution.seat : null;
+  const target =
+    taken !== null ? toward(taken, chairs) : ({ '--tx': '26vw', '--ty': '-19vh' } as CSSProperties);
+  phases.push({
+    from: 'pile',
+    mode: taken !== null ? 'take' : 'bito',
+    duration: FLY_MS,
+    cards: laid.map((c) => ({
+      key: `pile-${c.card}`,
+      card: c.card,
+      faceDown: false,
+      // Taken cards turn over as they go into a hand; a beaten bout stays face
+      // up all the way to the discard, because everyone saw it.
+      flips: taken !== null,
+      enters: false,
+      delay: 0,
+      place: at(c.x, c.y, target),
+    })),
+  });
+
+  if (step.deals.length > 0) {
+    phases.push({
+      from: 'deck',
+      mode: 'deal',
+      duration: DEAL_MS + (step.deals.length - 1) * DEAL_GAP,
+      cards: step.deals.map((d, i) => ({
+        key: `deal-${i}`,
         // The bottom card lies face up under the pile; it turns over as it is
         // dealt, and it is always the very last one out.
-        const isTrump = after.deckCount === 0 && before.trumpCard !== null && i === total - 1;
-        cards.push({
-          key: `deal-${seat}-${n}`,
-          card: isTrump ? before.trumpCard! : 0,
-          faceDown: !isTrump,
-          flips: isTrump,
-          delay: i * DEAL_GAP,
-          place: toward(seat, chairs),
-        });
-      }
-    }
-    phases.push({ from: 'deck', mode: 'deal', cards, duration: DEAL_MS + (total - 1) * DEAL_GAP });
+        card: d.card ?? 0,
+        faceDown: d.card === null,
+        flips: d.card !== null,
+        enters: false,
+        delay: i * DEAL_GAP,
+        place: toward(d.seat, chairs),
+      })),
+    });
   }
 
   return phases;
 }
 
-/** Deal order: opening attacker, then clockwise, defender last. */
-function dealRank(seat: Seat, before: Snapshot): number {
-  if (seat === before.defender) return 1000;
-  const seats = before.hands.size;
-  return (seat - before.attacker + seats) % seats;
-}
-
-function useFlight(model: BoardModel, chairs: Map<Seat, CSSProperties>): Flight | null {
-  const previous = useRef<Snapshot | null>(null);
+function useFlight(
+  model: BoardModel,
+  chairs: Map<Seat, CSSProperties>,
+  events: readonly BoardEvent[],
+): Flight | null {
+  const seen = useRef<number | null>(null);
+  const pile = useRef<Pile>([]);
   const latestChairs = useRef(chairs);
   latestChairs.current = chairs;
   const [flight, setFlight] = useState<Flight | null>(null);
 
   useEffect(() => {
-    const before = previous.current;
-    const after = snapshot(model);
-    previous.current = after;
-    if (before === null) return;
+    // A shorter list means a new game, not a rewind of this one.
+    if (seen.current === null || events.length < seen.current) {
+      seen.current = events.length;
+      pile.current = model.table;
+      return;
+    }
+    const fresh = events.slice(seen.current);
+    seen.current = events.length;
+    const before = pile.current;
+    pile.current = model.table;
+    if (fresh.length === 0) return;
 
-    const phases = planFlights(before, after, latestChairs.current);
+    const phases = planFlights(before, fresh, latestChairs.current);
     if (phases.length === 0) return;
 
     let index = 0;
@@ -472,7 +526,7 @@ function useFlight(model: BoardModel, chairs: Map<Seat, CSSProperties>): Flight 
       clearTimeout(timer);
       setFlight(null);
     };
-  }, [model]);
+  }, [events, model]);
 
   return flight;
 }
@@ -484,7 +538,7 @@ function FlightLayer({ flight }: { flight: Flight }) {
       {flight.cards.map((c) => (
         <span
           key={c.key}
-          className={`flight__card${c.flips ? ' flight__card--flip' : ''}`}
+          className={`flight__card${c.flips ? ' flight__card--flip' : ''}${c.enters ? ' flight__card--enter' : ''}`}
           style={{ ...c.place, animationDelay: `${c.delay}ms` }}
         >
           <span className="flight__flip">

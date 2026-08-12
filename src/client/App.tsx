@@ -10,7 +10,7 @@ import {
 import { CLIENT_VERSION } from '../shared/version.js';
 import { Board } from './game/Board.js';
 import { describeEvent, describePublicEvent } from './game/log.js';
-import { modelFromState, modelFromView, playedBy } from './game/model.js';
+import { modelFromState, modelFromView } from './game/model.js';
 import { RulesPanel } from './game/RulesPanel.js';
 import { defaultSetup, useLocalGame, type LocalGameSetup } from './game/useLocalGame.js';
 import { useI18n, useT, type Translate } from './i18n/index.js';
@@ -67,7 +67,6 @@ function LocalGame({ mode, setMode, settings, set }: ModeProps) {
     return lines.slice(-14).reverse();
   }, [game.events, t]);
 
-  const origins = useMemo(() => playedBy(game.events), [game.events]);
 
   const menus: MenuSpec[] = [
     {
@@ -218,7 +217,7 @@ function LocalGame({ mode, setMode, settings, set }: ModeProps) {
           showStatus={settings.showStatus}
           sortBy={settings.sortBy}
           hints={settings.hints}
-          playedBy={origins}
+          events={game.events}
         />
         {settings.showLog ? <Log lines={log} /> : null}
       </div>
@@ -270,7 +269,6 @@ function OnlineGame({ mode, setMode, settings, set }: ModeProps) {
     return lines.slice(-14).reverse();
   }, [net.events, net.room]);
 
-  const origins = useMemo(() => playedBy(net.events), [net.events]);
 
   const inGame = net.room !== null && net.room.phase === 'playing' && model !== null;
 
@@ -348,7 +346,7 @@ function OnlineGame({ mode, setMode, settings, set }: ModeProps) {
             showStatus={settings.showStatus}
             sortBy={settings.sortBy}
             hints={settings.hints}
-            playedBy={origins}
+            events={net.events}
             play={(move) => {
               if (net.view) net.move(net.view.seq, move);
             }}

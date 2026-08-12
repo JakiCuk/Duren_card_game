@@ -60,6 +60,11 @@ describe('the stylesheet', () => {
     }
   });
 
+  it('draws the held pile and only animates the card that just landed', () => {
+    expect(css).toContain('.flight--hold .flight__card {');
+    expect(css).toContain('.flight--hold .flight__card--enter {');
+  });
+
   it('keeps one animation per way a card can leave the table', () => {
     // Sweeping a beaten bout, scooping up a taken one and dealing from the deck
     // look nothing alike, and collapsing them was what made taking read as
