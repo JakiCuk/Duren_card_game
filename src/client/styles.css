@@ -579,7 +579,622 @@ body {
   color: color-mix(in srgb, var(--color-text) 55%, transparent);
 }
 
-.seat--me.seat--turn .seat__head {
+.avatar {
+  flex: none;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+  background: var(--avatar-bg);
+  color: var(--avatar-ink);
+  font-family: var(--font-heading);
+  font-weight: var(--font-heading-weight);
+  font-size: 14px;
+  letter-spacing: 0;
+}
+
+.problem {
+  margin: var(--space-2) 0 0;
+  font-size: 13px;
+}
+
+.problem--error {
+  color: var(--danger-ink);
+}
+
+.problem--warn {
+  color: color-mix(in srgb, var(--color-text) 60%, transparent);
+}
+
+.visually-hidden {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+}
+
+/* --- top bar -------------------------------------------------------------- */
+
+.topbar {
+  position: relative;
+  z-index: 40;
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  padding: var(--space-3) var(--space-4);
+  flex-wrap: wrap;
+}
+
+.brand {
+  font-family: var(--font-heading);
+  font-weight: var(--font-heading-weight);
+  font-size: 22px;
+  letter-spacing: -0.02em;
+  margin-right: var(--space-3);
+}
+
+.brand span {
+  color: var(--color-accent);
+}
+
+.topbar__menus {
+  display: flex;
+  align-items: center;
+  gap: var(--space-1);
+  flex: none;
+}
+
+.topbar__right {
+  margin-left: auto;
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  flex-wrap: wrap;
+}
+
+.roomchip {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 14px;
+  border-radius: 999px;
+  background: var(--color-surface);
+  font-size: 12px;
+  white-space: nowrap;
+}
+
+.roomchip__dot {
+  flex: none;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--ok-dot);
+}
+
+.roomchip__dot--connecting {
+  background: var(--color-accent);
+}
+
+.roomchip__dot--offline {
+  background: var(--danger-ink);
+}
+
+.pill {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 18px;
+  height: 18px;
+  padding: 0 5px;
+  border-radius: 999px;
+  background: var(--color-accent);
+  color: var(--color-bg);
+  font-family: var(--font-body);
+  font-size: 10px;
+  font-weight: 700;
+}
+
+/* --- pop-over menus ------------------------------------------------------- */
+
+.menu__scrim {
+  position: fixed;
+  inset: 0;
+  z-index: 35;
+}
+
+.menu {
+  position: absolute;
+  z-index: 45;
+  top: 62px;
+  left: var(--space-4);
+  width: min(38rem, calc(100vw - 2 * var(--space-4)));
+  max-height: min(72vh, 44rem);
+  overflow-y: auto;
+  padding: var(--space-4);
+  border-radius: var(--radius-lg);
+  background: var(--color-surface);
+  box-shadow: var(--shadow-lg);
+}
+
+.menu h2 {
+  font-size: 18px;
+  margin-bottom: var(--space-3);
+}
+
+.menu__label {
+  font-size: 12px;
+  color: color-mix(in srgb, var(--color-text) 60%, transparent);
+  margin-bottom: 6px;
+}
+
+.menu--right {
+  left: auto;
+  right: var(--space-4);
+  width: min(24rem, calc(100vw - 2 * var(--space-4)));
+}
+
+/* --- the table ------------------------------------------------------------ */
+
+.stage {
+  position: relative;
+  z-index: 10;
+  /* Header plus footer, so the table fills the window without scrolling it. */
+  height: calc(100vh - 7rem);
+  min-height: 41rem;
+}
+
+.board {
+  position: absolute;
+  inset: 0;
+}
+
+.felt {
+  position: absolute;
+  left: 50%;
+  top: 46%;
+  transform: translate(-50%, -50%);
+  width: min(64vw, 880px);
+  height: min(46vh, 430px);
+  border-radius: 50%;
+  background: var(--felt);
+  box-shadow:
+    inset 0 0 0 14px var(--felt-ring),
+    var(--shadow-lg);
+}
+
+/* Deck, status row and the pile all live on one centred stack so nothing can
+   drift into a chair, whatever the player count. */
+.felt__centre {
+  position: absolute;
+  left: 50%;
+  top: 46%;
+  transform: translate(-50%, -50%);
+  display: grid;
+  justify-items: center;
+  gap: var(--space-2);
+  width: min(62vw, 860px);
+}
+
+.chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  background: color-mix(in srgb, var(--color-surface) 82%, transparent);
+  border-radius: 999px;
+  padding: 3px 12px;
+  font-size: 12px;
+  color: color-mix(in srgb, var(--color-text) 75%, transparent);
+}
+
+.chip strong {
+  color: var(--color-text);
+  font-size: 15px;
+}
+
+.felt__pile {
+  display: flex;
+  align-items: center;
+  gap: var(--space-6);
+  min-height: 9.6rem;
+}
+
+/* The draw pile sits to the left of the cards in play, exactly as at a real
+   table: near the dealer's hand and out of the way of the bout. */
+.felt__deck {
+  position: relative;
+  flex: none;
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+}
+
+.deck__trump {
+  rotate: 90deg;
+  margin-right: -2.6rem;
+}
+
+/* The pile sits on top of the trump card, which pokes out from under it. */
+.deck__pile {
+  position: relative;
+  z-index: 1;
+  display: inline-block;
+  line-height: 0;
+}
+
+.deck__empty {
+  font-size: 12px;
+  color: var(--felt-ink);
+  max-width: 6rem;
+}
+
+.table {
+  position: relative;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-4);
+  min-height: 9.6rem;
+  flex: 1;
+}
+
+.table__hint {
+  margin: 0;
+  font-size: 13px;
+  color: var(--felt-ink);
+}
+
+.pair {
+  position: relative;
+  width: 6.4rem;
+  height: 9.6rem;
+}
+
+.pair .card {
+  position: absolute;
+  left: 0;
+  top: 0;
+}
+
+.pair__defence {
+  position: absolute;
+  left: 1.1rem;
+  top: 1.7rem;
+  rotate: 9deg;
+}
+
+.pair .card,
+.pair__defence {
+  animation: cardIn 0.44s cubic-bezier(0.22, 0.61, 0.36, 1) both;
+}
+
+/* Cards arrive from the chair that played them and leave towards wherever the
+   bout went, so the table never simply blinks and changes. */
+@keyframes cardIn {
+  from {
+    transform: translate(var(--fx, 0), var(--fy, 0)) scale(0.62) rotate(-7deg);
+    opacity: 0;
+  }
+
+  35% {
+    opacity: 1;
+  }
+
+  to {
+    transform: none;
+    opacity: 1;
+  }
+}
+
+.flight {
+  position: absolute;
+  left: 0;
+  top: 0;
+  pointer-events: none;
+  z-index: 6;
+}
+
+/* Cards leaving the pile start exactly where they lay, so the flight begins on
+   the spot the eye is already looking at. */
+.flight--pile {
+  left: 50%;
+  top: 0;
+}
+
+.flight__card {
+  position: absolute;
+  left: var(--x, 0);
+  top: var(--y, 0);
+  display: block;
+  perspective: 900px;
+}
+
+.flight--bito .flight__card {
+  animation: cardBito 0.62s cubic-bezier(0.4, 0, 0.9, 0.6) both;
+}
+
+/* Taking is a scoop, not a sweep: the cards turn face down and gather into one
+   packet, and only that packet travels. Both halves matter — without the
+   gather it reads as a discard, and without the turn it reads as cards being
+   shown to the table rather than picked up. */
+.flight--take .flight__card {
+  animation: cardTake 0.68s cubic-bezier(0.5, 0, 0.4, 1) both;
+}
+
+.flight--deal .flight__card {
+  animation: cardDeal 0.42s cubic-bezier(0.4, 0, 0.6, 1) both;
+}
+
+@keyframes cardBito {
+  from {
+    transform: translate(0, 0) scale(1);
+    opacity: 1;
+  }
+
+  to {
+    transform: translate(var(--tx, 0), var(--ty, 0)) scale(0.72) rotate(9deg);
+    opacity: 0;
+  }
+}
+
+@keyframes cardTake {
+  0% {
+    transform: translate(0, 0) scale(1);
+    opacity: 1;
+  }
+
+  40% {
+    transform: translate(calc(var(--x, 0px) * -1), calc(var(--y, 0px) * -1)) scale(1);
+    opacity: 1;
+  }
+
+  85% {
+    opacity: 1;
+  }
+
+  100% {
+    transform: translate(
+        calc(var(--tx, 0px) - var(--x, 0px)),
+        calc(var(--ty, 0px) - var(--y, 0px))
+      )
+      scale(0.8);
+    opacity: 0;
+  }
+}
+
+@keyframes cardDeal {
+  from {
+    transform: translate(0, 0) scale(1);
+    opacity: 1;
+  }
+
+  85% {
+    opacity: 1;
+  }
+
+  to {
+    transform: translate(var(--tx, 0), var(--ty, 0)) scale(0.8);
+    opacity: 0;
+  }
+}
+
+/* The turn is a real half-rotation, so the card genuinely shows its other side
+   rather than swapping images and hoping nobody looks. */
+.flight__flip {
+  display: block;
+  position: relative;
+  transform-style: preserve-3d;
+}
+
+/* Short on purpose: the turn has to be finished by the time the packet sets
+   off, or the cards look like they are being shown rather than picked up. */
+.flight__card--flip .flight__flip {
+  animation: cardFlip 0.26s ease-in-out both;
+  animation-delay: inherit;
+}
+
+@keyframes cardFlip {
+  from {
+    transform: rotateY(0deg);
+  }
+
+  to {
+    transform: rotateY(180deg);
+  }
+}
+
+.flight__face {
+  display: block;
+  backface-visibility: hidden;
+}
+
+.flight__face--back {
+  position: absolute;
+  inset: 0;
+  transform: rotateY(180deg);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .pair .card,
+  .pair__defence,
+  .flight__card,
+  .flight__flip {
+    animation: none;
+  }
+
+  .flight {
+    display: none;
+  }
+}
+
+.pair--target::after {
+  content: '';
+  position: absolute;
+  inset: -6px;
+  border: 2px dashed var(--color-accent);
+  border-radius: calc(var(--card-radius) + 6px);
+  pointer-events: none;
+}
+
+/* --- seats around the table ----------------------------------------------- */
+
+.seat--across {
+  position: absolute;
+  transform: translate(-50%, -50%);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+}
+
+.seat__head {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 14px 8px 8px;
+  border-radius: 999px;
+  background: var(--color-surface);
+  box-shadow: var(--shadow-sm);
+  outline-offset: 2px;
+}
+
+.seat__who {
+  display: flex;
+  flex-direction: column;
+  line-height: 1.2;
+  text-align: left;
+}
+
+.seat__name {
+  font-size: 13px;
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+.seat__roles {
+  font-size: 11px;
+  color: color-mix(in srgb, var(--color-text) 55%, transparent);
+  white-space: nowrap;
+}
+
+.seat__count {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  margin-left: 6px;
+  padding: 2px 9px;
+  border-radius: 999px;
+  background: var(--avatar-2-bg);
+  color: var(--avatar-2-ink);
+  font-size: 11px;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+}
+
+.seat__team {
+  font-size: 10px;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  border-radius: 999px;
+  padding: 1px 7px;
+  border: 1px solid currentcolor;
+}
+
+.seat--team0 .seat__team {
+  color: #4d7fbd;
+}
+
+.seat--team1 .seat__team {
+  color: var(--color-accent);
+}
+
+.seat--can-act .seat__head {
+  outline: 3px solid var(--color-accent);
+}
+
+.seat--away {
+  opacity: 0.6;
+}
+
+.hand--fan {
+  display: flex;
+  justify-content: center;
+  min-height: 2.2rem;
+}
+
+.hand--fan .card + .card {
+  margin-left: -1.5rem;
+}
+
+.hand--fan .card__img {
+  width: 2.2rem;
+  border-radius: 6px;
+}
+
+.hand__empty {
+  font-size: 11px;
+  color: color-mix(in srgb, var(--color-text) 55%, transparent);
+}
+
+/* --- the tray: buttons, whose turn it is, your hand ------------------------ */
+
+.tray {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--space-3);
+  padding-bottom: var(--space-4);
+}
+
+.actions {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-3);
+  flex-wrap: wrap;
+  min-height: 2.4rem;
+}
+
+.actions .btn {
+  background: var(--color-surface);
+  border-color: transparent;
+}
+
+.actions .btn--primary {
+  background: var(--color-accent);
+  padding: 10px 28px;
+  font-size: 16px;
+}
+
+.actions .btn--warn {
+  background: var(--danger-ink);
+  color: var(--color-bg);
+}
+
+
+@keyframes turnPulse {
+  0%,
+  100% {
+    box-shadow: 0 0 0 3px color-mix(in srgb, var(--color-accent) 55%, transparent);
+  }
+
+  50% {
+    box-shadow: 0 0 0 9px color-mix(in srgb, var(--color-accent) 18%, transparent);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .seat--me.seat--turn .seat__head {
     animation: none;
   }
 }
@@ -618,9 +1233,6 @@ body {
 
 .seat--me.seat--turn .seat__head {
   outline: 3px solid var(--color-accent);
-}
-
-.seat--me.seat--turn .seat__head {
   animation: turnPulse 1.8s ease-in-out infinite;
 }
 
