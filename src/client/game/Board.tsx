@@ -8,7 +8,7 @@ import {
   type Seat,
   type TableSlot,
 } from '../../engine/index.js';
-import { CardBackStack, CardFace } from '../cards/CardFace.js';
+import { CardBackStack, CardFace, stackTopOffset } from '../cards/CardFace.js';
 import { useT, type Translate } from '../i18n/index.js';
 import type { SortBy } from '../settings/useSettings.js';
 import type { BoardModel, BoardSeat } from './model.js';
@@ -131,7 +131,17 @@ export function Board({
                 ) : null}
                 <span className="deck__pile">
                   <CardBackStack count={model.deckCount} size="md" />
-                  <span className="deck__count">{model.deckCount}</span>
+                  {/* On the top card, not in the middle of the stack: the pile
+                      leans up and to the right as it thickens, and a badge
+                      centred on the whole block sits off the card it labels. */}
+                  <span
+                    className="deck__count"
+                    style={{
+                      translate: `calc(-50% + ${stackTopOffset(model.deckCount)}px) calc(-50% - ${stackTopOffset(model.deckCount)}px)`,
+                    }}
+                  >
+                    {model.deckCount}
+                  </span>
                 </span>
               </>
             ) : (
@@ -308,7 +318,9 @@ function Opponent({
       style={style}
     >
       <header className="seat__head">
-        <span className="avatar">{initials(player.name)}</span>
+        <span className="avatar">
+          <SeatIcon player={player} model={model} />
+        </span>
         <span className="seat__who">
           <span className="seat__name">{player.name}</span>
           <span className="seat__roles">{roles.join(' · ') || t('role.idle')}</span>
@@ -369,7 +381,9 @@ function Me({
       className={`seat seat--me${roleClasses(player, model)}${canAct ? ' seat--turn' : ''}`}
     >
       <header className="seat__head">
-        <span className="turn__avatar">{initials(player.name)}</span>
+        <span className="turn__avatar">
+          <SeatIcon player={player} model={model} />
+        </span>
         <span className="seat__who">
           <span className="seat__name">{player.name}</span>
           <span className="seat__roles">{roles.join(' · ') || t('role.idle')}</span>
@@ -449,13 +463,61 @@ const roleClasses = (p: BoardSeat, model: BoardModel): string =>
   `${p.team === null ? '' : ` seat--team${p.team}`}`;
 
 /**
- * Two letters for the avatar disc: initials when the name has words to take
- * them from, otherwise the first two characters.
+ * What the disc beside a name shows: the job that chair has right now.
+ *
+ * Initials were there first and said nothing the name beside them did not
+ * already say. A sword, a shield or a plus answers the question you actually
+ * have when you look up — who is attacking, who is defending, and who can still
+ * pile on. A chair with nothing to do stays blank rather than inventing a
+ * symbol for waiting.
  */
-function initials(name: string): string {
-  const words = name.trim().split(/\s+/).filter(Boolean);
-  if (words.length >= 2) return (words[0]![0]! + words[1]![0]!).toUpperCase();
-  return (words[0] ?? '?').slice(0, 2).toUpperCase();
+function SeatIcon({ player, model }: { player: BoardSeat; model: BoardModel }) {
+  const t = useT();
+  const role = seatRole(player, model);
+  if (role === null) return null;
+
+  const label = t(`role.${role === 'throwIn' ? 'canThrowIn' : role === 'shield' ? 'defends' : 'attacks'}`);
+  return (
+    <svg className="seat__icon" viewBox="0 0 24 24" role="img" aria-label={label}>
+      <title>{label}</title>
+      {role === 'shield' ? (
+        <path
+          d="M12 2.4 4.6 5.3v6.1c0 4.6 3.1 8.6 7.4 10.2 4.3-1.6 7.4-5.6 7.4-10.2V5.3Z"
+          fill="none"
+          stroke="currentColor"
+          strokeWidth="1.9"
+          strokeLinejoin="round"
+        />
+      ) : null}
+      {role === 'sword' ? (
+        <g fill="none" stroke="currentColor" strokeWidth="1.9" strokeLinecap="round" strokeLinejoin="round">
+          <path d="M19.6 3.2 10 12.8l1.6 1.6 9.6-9.6V3.2Z" />
+          <path d="m8.2 14.6 1.2 1.2M4.4 16.6l3 3M6.2 21.4l-2.8.4.4-2.8" />
+        </g>
+      ) : null}
+      {role === 'throwIn' ? (
+        <g fill="none" stroke="currentColor" strokeWidth="2.1" strokeLinecap="round">
+          <path d="M12 5.6v12.8M5.6 12h12.8" />
+        </g>
+      ) : null}
+    </svg>
+  );
+}
+
+/**
+ * The one job a chair has this instant, or nothing.
+ *
+ * "Can throw in" is read off `actors`, which is the same approximation the
+ * board already draws highlights from: online the client cannot see another
+ * player's hand, so it can only say that the seat has not passed and the bout
+ * is still open to additions.
+ */
+function seatRole(p: BoardSeat, model: BoardModel): 'sword' | 'shield' | 'throwIn' | null {
+  if (p.out || model.finished) return null;
+  if (p.seat === model.defenderSeat) return 'shield';
+  if (p.seat === model.attackerSeat) return 'sword';
+  if (model.table.length > 0 && !p.passed && model.actors.includes(p.seat)) return 'throwIn';
+  return null;
 }
 
 /**

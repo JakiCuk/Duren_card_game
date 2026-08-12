@@ -87,6 +87,21 @@ export function CardFace({
   );
 }
 
+/**
+ * How a face-down stack is drawn: at most four visible layers, each nudged two
+ * pixels up and to the right of the one below.
+ *
+ * Exported because anything placed *on* the pile — the count badge, say — has
+ * to know where the top card actually ended up, and re-deriving that offset by
+ * eye is how badges drift.
+ */
+export const STACK_LAYERS = 4;
+export const STACK_STEP = 2;
+
+/** Pixels the topmost card of a stack of `count` sits above and right of the base. */
+export const stackTopOffset = (count: number): number =>
+  (Math.min(count, STACK_LAYERS) - 1) * STACK_STEP;
+
 /** A face-down stack, e.g. the draw pile. `count` drives the visible thickness. */
 export function CardBackStack({
   count,
@@ -101,7 +116,7 @@ export function CardBackStack({
   // The hook runs unconditionally; only its result is optional.
   const fromContext = useCardTheme();
   const deck = theme ?? fromContext;
-  const layers = Math.min(count, 4);
+  const layers = Math.min(count, STACK_LAYERS);
   return (
     <span className={`stack stack--${size}`} aria-label={t('card.deckOf', { count })}>
       {Array.from({ length: layers }, (_, i) => (
@@ -111,7 +126,10 @@ export function CardBackStack({
           src={deck.back}
           alt=""
           draggable={false}
-          style={{ aspectRatio: String(deck.aspect), translate: `${i * 2}px ${i * -2}px` }}
+          style={{
+            aspectRatio: String(deck.aspect),
+            translate: `${i * STACK_STEP}px ${i * -STACK_STEP}px`,
+          }}
         />
       ))}
     </span>

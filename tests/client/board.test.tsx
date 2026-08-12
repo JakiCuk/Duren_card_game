@@ -230,7 +230,9 @@ describe('playing against a bot', () => {
     const bot = seatPanel('Hráč 2');
     expect(bot.textContent).toContain('bot');
 
-    const images = within(bot).getAllByRole('img');
+    // Card images only: the seat also carries a role pictogram, which is an
+    // img in the accessibility tree and would otherwise be counted as a card.
+    const images = Array.from(bot.querySelectorAll('.hand .card img'));
     expect(images).toHaveLength(6);
     // Every one is the back. If a card code ever appears here, "play against
     // the computer" would be a lie anyone could check in dev tools.
@@ -543,6 +545,28 @@ describe('table layout', () => {
     expect(mine.querySelectorAll('.seat__name')).toHaveLength(1);
     expect(mine.querySelectorAll('.seat__roles')).toHaveLength(1);
     expect(mine.querySelectorAll('.seat__count')).toHaveLength(1);
+  });
+
+  it('shows the job of each chair as a pictogram, and nothing when idle', async () => {
+    const user = userEvent.setup();
+    await renderHotSeat(user);
+
+    const roleOf = (name: string): string | null =>
+      screen.getByRole('region', { name }).querySelector('.seat__icon title')?.textContent ?? null;
+
+    // Exactly one attacker and one defender at a two-handed table.
+    const roles = ['Hráč 1', 'Hráč 2'].map(roleOf);
+    expect(roles.filter((r) => r === 'útočí')).toHaveLength(1);
+    expect(roles.filter((r) => r === 'bráni')).toHaveLength(1);
+  });
+
+  it('centres the deck count on the top card, not the middle of the stack', () => {
+    renderApp();
+    const badge = document.querySelector<HTMLElement>('.deck__count')!;
+    // The pile leans up and to the right as it thickens; a badge pinned to the
+    // block's centre would sit off the card it is labelling.
+    expect(badge.style.translate).toContain('+ 6px');
+    expect(badge.style.translate).toContain('- 6px');
   });
 
   it('gives your own hand the biggest cards on the table', () => {

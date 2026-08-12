@@ -548,6 +548,12 @@ body {
   color: var(--color-accent);
 }
 
+.seat__icon {
+  width: 21px;
+  height: 21px;
+  display: block;
+}
+
 .avatar {
   flex: none;
   display: flex;
@@ -986,14 +992,6 @@ body {
 
 .seat--away {
   opacity: 0.6;
-}
-
-.seat--attacker .seat__name::before {
-  content: '⚔ ';
-}
-
-.seat--defender .seat__name::before {
-  content: '🛡 ';
 }
 
 .hand--fan {

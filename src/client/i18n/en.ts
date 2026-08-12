@@ -259,4 +259,5 @@ export const en: Dictionary = {
   'sort.power': 'By strength',
   'settings.hints': 'Move hints',
   'settings.hints.hint': 'Dims the cards you cannot play right now. Off, the hand looks the same throughout and keeping track is on you.',
+  'role.canThrowIn': 'can throw in',
 };

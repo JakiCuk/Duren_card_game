@@ -259,4 +259,5 @@ export const sk: Dictionary = {
   'sort.power': 'Podľa sily',
   'settings.hints': 'Nápoveda ťahu',
   'settings.hints.hint': 'Stmaví karty, ktoré teraz nemôžeš zahrať. Vypnuté vyzerá ruka rovnako a musíš si to ustrážiť sám.',
+  'role.canThrowIn': 'môže prihodiť',
 };

@@ -266,4 +266,5 @@ export const uk: Dictionary = {
   'sort.power': 'За силою',
   'settings.hints': 'Підказка ходу',
   'settings.hints.hint': 'Затемнює карти, якими зараз не можна ходити. Вимкнено — рука виглядає однаково і стежиш сам.',
+  'role.canThrowIn': 'може підкинути',
 };
