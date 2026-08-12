@@ -84,6 +84,10 @@ export const sk: Dictionary = {
 
   'banner.stalemate': 'Patová pozícia — karty len kolovali dokola, nikto nie je durak.',
   'banner.draw': 'Remíza — všetci sa zbavili kariet naraz.',
+  'rules.teams': 'Tímy 2v2',
+  'rules.teams.hint': 'Štyria hráči, dvojice oproti sebe. Spoluhráči na seba neútočia ani neprehadzujú.',
+  'team.name': 'Tím {n}',
+  'banner.teamLost': 'Prehráva {team}.',
   'banner.durak': 'Durak je {name}.',
 
   'log.title': 'Priebeh',
@@ -165,6 +169,8 @@ export const sk: Dictionary = {
   'preset.strict': 'Prísny',
   'preset.strict.blurb': 'Brať sa dá len keď naozaj niet čím zbiť, prvé kolo je obmedzené.',
   'preset.big': 'Veľký stôl',
+  'preset.teams': 'Tímy 2v2',
+  'preset.teams.blurb': 'Štyria hráči, dvojice sedia oproti sebe. Spoluhráč na teba nikdy neútočí.',
   'preset.big.blurb': '52 kariet pre 5–6 hráčov, útočia len susedia obrancu.',
 
   'problem.deck_too_small':
@@ -186,6 +192,8 @@ export const sk: Dictionary = {
     'Pravidlo „musí zbiť" berie obrancovi voľbu a výrazne pomáha počítajúcim botom.',
   'problem.must_beat_all_with_unlimited_pile':
     'S neobmedzeným prihadzovaním po „beriem" môžu útočníci obrancu mlieť celú ruku.',
+  'problem.teams_need_four': 'Tímy 2v2 sa hrajú presne v štyroch, teraz je vás {players}.',
+  'problem.scope_ignored_in_teams': 'V tímoch sú susedmi obrancu práve obaja súperi — voľba nič nemení.',
   'problem.not_enough_players': 'Na hru treba aspoň dvoch — pridaj hráča alebo bota.',
 
   'error.room_not_found': 'Izba s týmto kódom neexistuje. Skontroluj kód.',

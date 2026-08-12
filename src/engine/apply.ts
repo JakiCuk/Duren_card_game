@@ -17,9 +17,11 @@ import {
   cloneState,
   MAX_BOUTS_WITHOUT_PROGRESS,
   nextActiveFrom,
+  nextOpponentFrom,
   playerAt,
   seatCount,
   tableCards,
+  teamAt,
 } from './state.js';
 
 export class IllegalMoveError extends Error {
@@ -176,6 +178,15 @@ function resolveIfDone(s: GameState, events: GameEvent[]): void {
     finish(s, events, active, 'played_out');
     return;
   }
+  // Teams: the moment one side is entirely out, the other side has lost —
+  // there is nothing left for the survivors to play for.
+  if (s.config.teams !== null) {
+    const teamsLeft = new Set(active.map((seat) => teamAt(s, seat)));
+    if (teamsLeft.size === 1) {
+      finish(s, events, active, 'played_out');
+      return;
+    }
+  }
   if (s.boutsWithoutProgress >= MAX_BOUTS_WITHOUT_PROGRESS) {
     finish(s, events, [], 'stalemate');
     return;
@@ -186,7 +197,7 @@ function resolveIfDone(s: GameState, events: GameEvent[]): void {
   s.attacker = wasTaken
     ? nextActiveFrom(s, (defenderSeat + 1) % n)
     : nextActiveFrom(s, defenderSeat);
-  s.defender = nextActiveFrom(s, (s.attacker + 1) % n);
+  s.defender = nextOpponentFrom(s, (s.attacker + 1) % n, s.attacker);
   s.defenderHandAtBoutStart = playerAt(s, s.defender).hand.length;
   s.boutIndex += 1;
   s.passed.fill(false);
@@ -238,16 +249,24 @@ function finish(
 
   const durakSeat = active[0];
   const result: GameResult = {
-    durak: durakSeat === undefined ? null : playerAt(s, durakSeat).id,
+    durak: active.length === 1 && durakSeat !== undefined ? playerAt(s, durakSeat).id : null,
     order,
     reason,
+    // With teams the loss belongs to the side, not to whoever happened to be
+    // holding the last card.
+    loserTeam: durakSeat === undefined ? null : teamAt(s, durakSeat),
   };
 
   s.result = result;
   s.phase = 'finished';
   events.push({
     k: 'gameOver',
-    result: { durak: result.durak, order: result.order.slice(), reason },
+    result: {
+      durak: result.durak,
+      order: result.order.slice(),
+      reason,
+      loserTeam: result.loserTeam,
+    },
   });
 }
 

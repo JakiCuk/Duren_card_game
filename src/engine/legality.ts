@@ -55,6 +55,21 @@ export function ctxOf(s: GameState): LegalityCtx {
 
 const seatInfo = (ctx: LegalityCtx, seat: Seat): SeatInfo | undefined => ctx.seats[seat];
 
+/**
+ * Which side a seat plays for, or `null` in a free-for-all.
+ *
+ * Alternating seating is the only supported arrangement, so the team is simply
+ * the parity of the seat — which also means partners always sit opposite one
+ * another and never adjacent.
+ */
+export const teamOf = (ctx: LegalityCtx, seat: Seat): 0 | 1 | null =>
+  ctx.config.teams === null ? null : ((seat % 2) as 0 | 1);
+
+export const sameTeam = (ctx: LegalityCtx, a: Seat, b: Seat): boolean => {
+  const team = teamOf(ctx, a);
+  return team !== null && team === teamOf(ctx, b);
+};
+
 const isIn = (ctx: LegalityCtx, seat: Seat): boolean => {
   const info = seatInfo(ctx, seat);
   return info !== undefined && !info.out;
@@ -90,6 +105,8 @@ export function eligibleAttackers(ctx: LegalityCtx): Seat[] {
   for (const info of ctx.seats) {
     if (info.seat === ctx.defenderSeat || info.out || info.handCount === 0) continue;
     if (canJoin && !canJoin.has(info.seat)) continue;
+    // You never attack your own partner, whatever the scope setting says.
+    if (sameTeam(ctx, info.seat, ctx.defenderSeat)) continue;
     out.push(info.seat);
   }
   return out;
@@ -225,6 +242,8 @@ export function transferableCards(ctx: LegalityCtx, seat: Seat): { card: CardId;
 
   const target = transferTarget(ctx);
   if (target === seat) return [];
+  // Handing the bout to your partner would be handing them the loss.
+  if (sameTeam(ctx, target, seat)) return [];
   const targetInfo = seatInfo(ctx, target);
   if (targetInfo === undefined || targetInfo.out) return [];
 

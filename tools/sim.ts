@@ -83,6 +83,8 @@ export function randomSetup(
       firstAttacker: nextInt(rng, 2) === 0 ? 'lowestTrump' : 'random',
       defenderMustBeatAll: nextInt(rng, 3) === 0,
       trumpCardVisible: nextInt(rng, 4) > 0,
+      // Teams only exist at four players, so they are sampled with the seating.
+      teams: players === 4 && nextInt(rng, 3) === 0 ? { size: 2, seating: 'alternating' } : null,
     };
     if (isPlayable(config, players)) return { config, players };
   }

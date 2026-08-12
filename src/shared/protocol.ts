@@ -44,6 +44,7 @@ export const ruleConfigSchema = z.object({
   firstAttacker: z.enum(['lowestTrump', 'random']),
   defenderMustBeatAll: z.boolean(),
   trumpCardVisible: z.boolean(),
+  teams: z.union([z.null(), z.object({ size: z.literal(2), seating: z.literal('alternating') })]),
 });
 
 /**

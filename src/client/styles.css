@@ -689,3 +689,20 @@ body {
   clip-path: inset(50%);
   white-space: nowrap;
 }
+
+.seat__team {
+  font-size: 0.72rem;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  border-radius: 999px;
+  padding: 0.05rem 0.45rem;
+  border: 1px solid currentColor;
+}
+
+.seat--team0 .seat__team {
+  color: #6aa9e0;
+}
+
+.seat--team1 .seat__team {
+  color: #d99a5a;
+}

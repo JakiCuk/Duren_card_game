@@ -65,6 +65,9 @@ export function RulesPanel({ config, onChange }: RulesPanelProps) {
             {t('rules.scope')}
             <select
               value={config.attackerScope}
+              // In a 2v2 the defender's neighbours are exactly the two
+              // opponents, so the two options mean the same thing.
+              disabled={config.teams !== null}
               onChange={(e) => set('attackerScope', e.target.value as AttackerScope)}
             >
               <option value="all">{t('rules.scope.all')}</option>
@@ -152,6 +155,12 @@ export function RulesPanel({ config, onChange }: RulesPanelProps) {
             hint={t('rules.firstBoutCap.hint')}
             checked={config.firstBoutCapFive}
             onChange={(v) => set('firstBoutCapFive', v)}
+          />
+          <Toggle
+            label={t('rules.teams')}
+            hint={t('rules.teams.hint')}
+            checked={config.teams !== null}
+            onChange={(v) => set('teams', v ? { size: 2, seating: 'alternating' } : null)}
           />
           <Toggle
             label={t('rules.trumpVisible')}

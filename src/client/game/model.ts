@@ -26,6 +26,8 @@ export interface BoardSeat {
   connected: boolean;
   /** A stand-in is playing this seat because nobody came back for it. */
   substituted: boolean;
+  /** `null` in a free-for-all. */
+  team: 0 | 1 | null;
 }
 
 /**
@@ -89,6 +91,7 @@ export function modelFromState(state: GameState, opts: LocalModelOptions): Board
       isBot: opts.isBot(p.seat),
       connected: true,
       substituted: false,
+      team: state.config.teams === null ? null : ((p.seat % 2) as 0 | 1),
     })),
     actors,
     controllable: actors.filter((s) => !opts.isBot(s)),
@@ -140,6 +143,7 @@ export function modelFromView(view: PlayerView, opts: RemoteModelOptions): Board
       isBot: opts.isBot(p.seat),
       connected: opts.connected(p.seat),
       substituted: opts.substituted(p.seat),
+      team: p.team,
     })),
     actors: [...(iCanAct && mySeat !== null ? [mySeat] : []), ...others],
     controllable: iCanAct && mySeat !== null ? [mySeat] : [],

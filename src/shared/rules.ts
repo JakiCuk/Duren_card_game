@@ -23,11 +23,19 @@ export interface TransferRules {
 }
 
 /**
+ * 2v2. Only four players and only alternating seats: six-handed team play
+ * triples the turn-order edge cases for a variant almost nobody plays.
+ */
+export interface TeamRules {
+  size: 2;
+  seating: 'alternating';
+}
+
+export const TEAM_PLAYERS = 4;
+
+/**
  * House rules for one room. Locked in at game start and copied into the
  * `GameState`, so a mid-game change is impossible by construction.
- *
- * 2v2 teams are the one variant still missing; they arrive with their own
- * slice, because the teammate bans touch every rule below.
  */
 export interface RuleConfig {
   deckSize: DeckSize;
@@ -56,6 +64,8 @@ export interface RuleConfig {
   defenderMustBeatAll: boolean;
   /** Bottom card of the deck turned face up. Hiding it changes the information game. */
   trumpCardVisible: boolean;
+  /** `null` for a free-for-all. */
+  teams: TeamRules | null;
 }
 
 export const DEFAULT_RULES: RuleConfig = {
@@ -71,6 +81,7 @@ export const DEFAULT_RULES: RuleConfig = {
   firstAttacker: 'lowestTrump',
   defenderMustBeatAll: false,
   trumpCardVisible: true,
+  teams: null,
 };
 
 export interface ConfigProblem {
@@ -147,6 +158,17 @@ export function validateConfig(config: RuleConfig, players: number): ConfigVerdi
     warnings.push({ code: 'transfer_two_players' });
   }
 
+  if (config.teams !== null) {
+    if (players !== TEAM_PLAYERS) {
+      errors.push({ code: 'teams_need_four', params: { players, required: TEAM_PLAYERS } });
+    }
+    // With alternating seats at four players the defender's neighbours are
+    // exactly the two opponents, so the scope setting has nothing left to say.
+    if (config.attackerScope === 'neighbours') {
+      warnings.push({ code: 'scope_ignored_in_teams' });
+    }
+  }
+
   if (config.defenderMustBeatAll) {
     // It removes the defender's central decision, and it hands counting bots a
     // certainty: "they took" now proves "they had nothing".
@@ -192,5 +214,9 @@ export const PRESETS: RulePreset[] = [
   {
     id: 'big',
     config: { ...DEFAULT_RULES, deckSize: 52, attackerScope: 'neighbours' },
+  },
+  {
+    id: 'teams',
+    config: { ...DEFAULT_RULES, teams: { size: 2, seating: 'alternating' } },
   },
 ];

@@ -45,6 +45,8 @@ export interface GameResult {
    * `MAX_BOUTS_WITHOUT_PROGRESS`.
    */
   reason: 'played_out' | 'stalemate';
+  /** In a 2v2 game, the side that was left holding cards. */
+  loserTeam: 0 | 1 | null;
 }
 
 /**
@@ -111,6 +113,29 @@ export const activeSeats = (s: GameState): Seat[] =>
   s.players.filter((p) => p.outAtStep === null).map((p) => p.seat);
 
 export const nextSeat = (s: GameState, seat: Seat): Seat => (seat + 1) % seatCount(s);
+
+/** Alternating seating, so a seat's team is simply its parity. */
+export const teamAt = (s: GameState, seat: Seat): 0 | 1 | null =>
+  s.config.teams === null ? null : ((seat % 2) as 0 | 1);
+
+/**
+ * First active seat at or clockwise after `seat` who is *not* on `avoid`'s team.
+ *
+ * Plain rotation is not enough once somebody is out: with two players gone the
+ * next seat round can be your own partner, and a bout where partners face each
+ * other has no attackers at all.
+ */
+export function nextOpponentFrom(s: GameState, seat: Seat, avoid: Seat): Seat {
+  const n = seatCount(s);
+  const team = teamAt(s, avoid);
+  for (let i = 0; i < n; i++) {
+    const candidate = (seat + i) % n;
+    if (!isActive(s, candidate)) continue;
+    if (team !== null && teamAt(s, candidate) === team) continue;
+    return candidate;
+  }
+  return nextActiveFrom(s, seat);
+}
 
 /** First active seat at or clockwise after `seat`. Throws if nobody is active. */
 export function nextActiveFrom(s: GameState, seat: Seat): Seat {
@@ -243,9 +268,7 @@ export function cloneState(s: GameState): GameState {
     passed: s.passed.slice(),
     transfersThisBout: s.transfersThisBout,
     boutsWithoutProgress: s.boutsWithoutProgress,
-    result: s.result
-      ? { durak: s.result.durak, order: s.result.order.slice(), reason: s.result.reason }
-      : null,
+    result: s.result ? { ...s.result, order: s.result.order.slice() } : null,
   };
 }
 

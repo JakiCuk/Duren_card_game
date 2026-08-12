@@ -141,14 +141,17 @@ describe('online room', () => {
       { timeout: 6000 },
     );
 
-    const before = document.querySelectorAll('[aria-label="Stôl"] img').length;
+    // The log, not the table: with an instant bot the bout can be beaten and
+    // swept before the assertion runs, leaving the table empty again. The log
+    // records that the move happened either way.
+    const before = document.querySelectorAll('.log li').length;
     await user.click(
       document.querySelector<HTMLElement>('.seat--active .hand button.card:not(.card--muted)')!,
     );
 
     await waitFor(
       () => {
-        expect(document.querySelectorAll('[aria-label="Stôl"] img').length).toBeGreaterThan(before);
+        expect(document.querySelectorAll('.log li').length).toBeGreaterThan(before);
       },
       { timeout: 6000 },
     );

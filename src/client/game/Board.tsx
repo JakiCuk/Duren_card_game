@@ -137,7 +137,7 @@ export function Board({ model, play }: BoardProps) {
             <section
               key={p.seat}
               aria-label={p.name}
-              className={`seat${p.seat === seat && mine ? ' seat--active' : ''}${canAct ? ' seat--can-act' : ''}${p.connected ? '' : ' seat--away'}`}
+              className={`seat${p.seat === seat && mine ? ' seat--active' : ''}${canAct ? ' seat--can-act' : ''}${p.connected ? '' : ' seat--away'}${p.team === null ? '' : ` seat--team${p.team}`}`}
             >
               <header className="seat__head">
                 <button
@@ -149,6 +149,9 @@ export function Board({ model, play }: BoardProps) {
                 >
                   {p.name}
                 </button>
+                {p.team === null ? null : (
+                  <span className="seat__team">{t('team.name', { n: p.team + 1 })}</span>
+                )}
                 <span className="seat__roles">{roles.join(' · ') || ' '}</span>
                 <span className="seat__count">{t('board.cards', { count: p.handCount })}</span>
               </header>

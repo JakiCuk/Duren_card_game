@@ -217,7 +217,12 @@ describe('ending the game', () => {
     const { state, events } = run(s, [attack(0, '6C'), defend(1, '7C')]);
 
     expect(state.phase).toBe('finished');
-    expect(state.result).toEqual({ durak: 'p2', order: ['p0', 'p1'], reason: 'played_out' });
+    expect(state.result).toEqual({
+      durak: 'p2',
+      order: ['p0', 'p1'],
+      reason: 'played_out',
+      loserTeam: null,
+    });
     expect(kinds(events)).toContain('gameOver');
     expect(find(events, 'out').map((e) => e.seat).sort()).toEqual([0, 1]);
   });
@@ -232,7 +237,12 @@ describe('ending the game', () => {
     });
 
     const { state } = run(s, [attack(0, '6C'), defend(1, '7C')]);
-    expect(state.result).toEqual({ durak: null, order: ['p0', 'p1'], reason: 'played_out' });
+    expect(state.result).toEqual({
+      durak: null,
+      order: ['p0', 'p1'],
+      reason: 'played_out',
+      loserTeam: null,
+    });
   });
 
   it('refuses further moves once finished', () => {

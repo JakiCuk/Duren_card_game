@@ -334,10 +334,13 @@ function ResultBanner({ result, seatName }: { result: GameResult; seatName: (sea
   const text =
     result.reason === 'stalemate'
       ? t('banner.stalemate')
-      : result.durak === null
-        ? t('banner.draw')
-        : // Player ids are seat-derived ("p0" locally, "s0" on the server).
-          t('banner.durak', { name: seatName(Number(result.durak.replace(/^\D+/, ''))) });
+      : result.loserTeam !== null
+        ? // With teams the loss belongs to the side, not to one player.
+          t('banner.teamLost', { team: t('team.name', { n: result.loserTeam + 1 }) })
+        : result.durak === null
+          ? t('banner.draw')
+          : // Player ids are seat-derived ("p0" locally, "s0" on the server).
+            t('banner.durak', { name: seatName(Number(result.durak.replace(/^\D+/, ''))) });
   return <section className={`banner${result.durak === null ? '' : ' banner--loss'}`}>{text}</section>;
 }
 

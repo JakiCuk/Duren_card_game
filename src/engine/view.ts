@@ -5,6 +5,7 @@ import type { LegalityCtx } from './legality.js';
 import { legalMoves } from './legality.js';
 import type { Move } from './moves.js';
 import type { GameResult, GameState, PlayerId, Seat, TableSlot } from './state.js';
+import { teamAt } from './state.js';
 
 export interface PublicPlayer {
   seat: Seat;
@@ -12,6 +13,8 @@ export interface PublicPlayer {
   handCount: number;
   out: boolean;
   passed: boolean;
+  /** `null` in a free-for-all. Public: everyone can see who sits opposite whom. */
+  team: 0 | 1 | null;
 }
 
 /**
@@ -66,6 +69,7 @@ export function redact(s: GameState, viewer: Seat | null): PlayerView {
       handCount: p.hand.length,
       out: p.outAtStep !== null,
       passed: s.passed[p.seat] === true,
+      team: teamAt(s, p.seat),
     })),
     deckCount: s.deck.length,
     discardCount: s.discard.length,
@@ -77,9 +81,7 @@ export function redact(s: GameState, viewer: Seat | null): PlayerView {
     boutIndex: s.boutIndex,
     transfersThisBout: s.transfersThisBout,
     finished: s.phase === 'finished',
-    result: s.result
-      ? { durak: s.result.durak, order: s.result.order.slice(), reason: s.result.reason }
-      : null,
+    result: s.result ? { ...s.result, order: s.result.order.slice() } : null,
     legalMoves: [],
   };
 
@@ -150,10 +152,7 @@ export function redactEvent(e: GameEvent, viewer: Seat | null): PublicEvent {
     case 'bito':
       return { k: 'bito', cards: e.cards.slice() };
     case 'gameOver':
-      return {
-        k: 'gameOver',
-        result: { durak: e.result.durak, order: e.result.order.slice(), reason: e.result.reason },
-      };
+      return { k: 'gameOver', result: { ...e.result, order: e.result.order.slice() } };
     case 'attack':
     case 'defend':
     case 'transfer':

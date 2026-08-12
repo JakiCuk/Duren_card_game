@@ -84,6 +84,10 @@ export const en: Dictionary = {
 
   'banner.stalemate': 'Stalemate — the cards just went round in circles, nobody is the fool.',
   'banner.draw': 'A draw — everybody ran out at the same time.',
+  'rules.teams': 'Teams 2v2',
+  'rules.teams.hint': 'Four players, partners opposite. Partners never attack or transfer to each other.',
+  'team.name': 'Team {n}',
+  'banner.teamLost': '{team} loses.',
   'banner.durak': '{name} is the durak.',
 
   'log.title': 'What happened',
@@ -165,6 +169,8 @@ export const en: Dictionary = {
   'preset.strict': 'Strict',
   'preset.strict.blurb': 'Taking only when nothing beats the attack, first bout capped.',
   'preset.big': 'Big table',
+  'preset.teams': 'Teams 2v2',
+  'preset.teams.blurb': 'Four players, partners sitting opposite. Your partner never attacks you.',
   'preset.big.blurb': "52 cards for 5–6 players, only the defender's neighbours attack.",
 
   'problem.deck_too_small':
@@ -186,6 +192,8 @@ export const en: Dictionary = {
     '"Must beat" removes the defender\'s choice and helps counting bots a great deal.',
   'problem.must_beat_all_with_unlimited_pile':
     'With unlimited throwing in after "I take", attackers can grind the defender\'s whole hand.',
+  'problem.teams_need_four': '2v2 teams need exactly four players; there are {players}.',
+  'problem.scope_ignored_in_teams': 'In teams the defender\u2019s neighbours are exactly the two opponents — the setting changes nothing.',
   'problem.not_enough_players': 'A game needs at least two — add a player or a bot.',
 
   'error.room_not_found': 'No room with that code. Check the code.',
