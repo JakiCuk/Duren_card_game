@@ -96,7 +96,12 @@ export function useOnline(enabled: boolean) {
       };
 
       ws.onclose = () => {
-        socket.current = null;
+        // Only disown the socket if it is still the live one. React mounts an
+        // effect twice in development, so an older socket's close event can
+        // arrive *after* its replacement has been installed — clearing the ref
+        // unconditionally leaves a working connection that nothing can send on,
+        // and every button in the room silently does nothing.
+        if (socket.current === ws) socket.current = null;
         if (closed) return;
         setState((s) => ({ ...s, connection: 'offline' }));
         // Back off, but never so far that a brief blip feels like a crash.
@@ -109,8 +114,9 @@ export function useOnline(enabled: boolean) {
     return () => {
       closed = true;
       if (reconnectTimer !== undefined) clearTimeout(reconnectTimer);
-      socket.current?.close();
+      const live = socket.current;
       socket.current = null;
+      live?.close();
     };
   }, [enabled]);
 
