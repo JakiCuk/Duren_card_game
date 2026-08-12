@@ -3,7 +3,7 @@ import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import fastifyStatic from '@fastify/static';
 import Fastify, { type FastifyInstance } from 'fastify';
-import { PROTOCOL_VERSION } from '../shared/version.js';
+import { APP_VERSION, PROTOCOL_VERSION } from '../shared/version.js';
 import type { ServerConfig } from './config.js';
 import { Hub } from './hub.js';
 import { registerWebsocket } from './ws.js';
@@ -47,6 +47,9 @@ export async function buildServerWithHub(config: ServerConfig): Promise<BuiltSer
 
   app.get('/healthz', () => ({
     ok: true,
+    // The release stamp, so a deployment can be identified without guessing:
+    // the same string is printed in the footer of every tab it serves.
+    version: APP_VERSION,
     protocol: PROTOCOL_VERSION,
     uptime: Math.round(process.uptime()),
     rooms: hub.rooms.size,

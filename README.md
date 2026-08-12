@@ -167,6 +167,29 @@ V produkcii Fastify servíruje aj statický build aj WebSocket, takže žiadne p
 netreba a hra beží na jedinej adrese. Užitočné premenné: `PORT`, `MAX_ROOMS`,
 `ROOM_IDLE_MS`, `GRACE_MS`, `TURN_TIMEOUT_MS`, `BOT_DELAY_MS`.
 
+### Verzie
+
+Verzia je **časová pečiatka vydania** v tvare `YYYYMMDD.HHMM`, napr. `20260731.1330`.
+
+```bash
+pnpm stamp    # zapíše aktuálny čas do package.json aj src/shared/version.ts
+```
+
+Dátum je pre takýto projekt lepší než počítadlo: nikto si ho neinštaluje ako závislosť,
+takže semver by hovoril len o tom, koľkokrát si niekto spomenul verziu zvýšiť. Pečiatka
+odpovedá na otázku, ktorú pri bežiacom stole naozaj máš — *je toto ten build, čo som
+nasadil?*
+
+Pečiatka sa **commituje**, negeneruje sa počas `pnpm build`. Verzia zapečená pri builde
+by sa líšila medzi klientským bundlom, serverom a Docker image a číslo v pätičke by
+prestalo identifikovať čokoľvek, čo sa dá vytiahnuť z gitu.
+
+Tú istú hodnotu vypisuje pätička v prehliadači aj `GET /healthz`, takže porovnanie
+„čo vidím" a „čo beží" je pohľad, nie vyšetrovanie.
+
+`PROTOCOL_VERSION` je od nej **nezávislá** — mení sa len keď sa zmení tvar správ na
+drôte, a stráži, aby zastaraná záložka nerozhodila živú izbu.
+
 ## Štruktúra
 
 | Priečinok | Obsah | Pravidlá |

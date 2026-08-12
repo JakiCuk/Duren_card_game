@@ -1,6 +1,6 @@
 {
   "name": "durak",
-  "version": "0.1.0",
+  "version": "20260813.0151",
   "private": true,
   "type": "module",
   "engines": {
@@ -26,7 +26,8 @@
     "test:watch": "vitest",
     "sim": "tsx tools/sim.ts",
     "duel": "tsx tools/duel.ts",
-    "bench": "tsx tools/bench.ts"
+    "bench": "tsx tools/bench.ts",
+    "stamp": "tsx tools/stamp-version.ts"
   },
   "dependencies": {
     "@fastify/static": "^8.2.0",

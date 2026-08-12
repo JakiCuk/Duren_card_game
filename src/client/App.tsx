@@ -7,7 +7,7 @@ import {
   type ConfigProblem,
   type RuleConfig,
 } from '../shared/rules.js';
-import { CLIENT_VERSION } from '../shared/version.js';
+import { APP_VERSION } from '../shared/version.js';
 import { Board } from './game/Board.js';
 import { describeEvent, describePublicEvent } from './game/log.js';
 import { modelFromState, modelFromView } from './game/model.js';
@@ -482,7 +482,7 @@ function Footer() {
   const { t } = useI18n();
   return (
     <footer className="footer">
-      <span>v{CLIENT_VERSION}</span>
+      <span>v{APP_VERSION}</span>
       <span>
         <a href="https://tekeye.uk" rel="noreferrer noopener" target="_blank">
           {t('app.cardsCredit')}
