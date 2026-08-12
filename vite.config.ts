@@ -15,6 +15,10 @@ export default defineConfig({
   },
   server: {
     port: 5173,
+    // Reachable from other devices on the network. The whole point of this
+    // project is playing with somebody else, and a dev server bound to
+    // localhost cannot be joined from the phone in your hand.
+    host: true,
     proxy: {
       // The Fastify server owns /ws and /api in dev too, so the client code
       // never needs to know whether it is running behind Vite or not.

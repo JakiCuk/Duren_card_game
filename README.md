@@ -5,12 +5,22 @@ Webová kartová hra Durak — proti botom (4 úrovne zložitosti) aj proti živ
 Jedna Node aplikácia: Fastify servíruje statický React build aj WebSocket. Bez databázy,
 bez účtov — izby sa vytvárajú anonymne a zdieľajú kódom.
 
-## Vývoj
+## Ako sa k hre pripojiť
 
 ```bash
 pnpm install
-pnpm dev          # Vite na :5173, Fastify na :3000 (Vite proxuje /ws a /api)
+pnpm dev
 ```
+
+Otvor **http://localhost:5173**. Vite servíruje UI, Fastify na :3000 drží WebSocket
+a herný stav; Vite mu proxuje `/ws` a `/api`, takže stačí jedna adresa.
+
+Dev server počúva aj na sieti — po štarte vypíše `Network: http://192.168.x.x:5173/`.
+Tú adresu pošli komukoľvek na rovnakej Wi-Fi a môžete hrať spolu: v hre prepni na
+**Online izba**, klikni *Vytvoriť izbu* a pošli 5-znakový kód.
+
+Na hru s niekým mimo tvojej siete treba server niekam nasadiť (viď Produkcia) alebo
+port dočasne pretunelovať, napr. `cloudflared tunnel --url http://localhost:5173`.
 
 ## Kontroly
 
@@ -82,10 +92,14 @@ botom zmerať nedá.
 ## Produkcia
 
 ```bash
-pnpm build
-docker build -t durak .
-docker run -p 3000:3000 durak
+pnpm build && pnpm start          # všetko na jednom porte: http://localhost:3000
+# alebo
+docker build -t durak . && docker run -p 3000:3000 durak
 ```
+
+V produkcii Fastify servíruje aj statický build aj WebSocket, takže žiadne proxy
+netreba a hra beží na jedinej adrese. Užitočné premenné: `PORT`, `MAX_ROOMS`,
+`ROOM_IDLE_MS`, `GRACE_MS`, `TURN_TIMEOUT_MS`, `BOT_DELAY_MS`.
 
 ## Štruktúra
 
