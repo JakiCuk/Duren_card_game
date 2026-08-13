@@ -190,6 +190,12 @@ Tú istú hodnotu vypisuje pätička v prehliadači aj `GET /healthz`, takže po
 `PROTOCOL_VERSION` je od nej **nezávislá** — mení sa len keď sa zmení tvar správ na
 drôte, a stráži, aby zastaraná záložka nerozhodila živú izbu.
 
+## Licencia
+
+Kód je pod **MIT** (`LICENSE`). Kartová grafika `classic` je CC0 sada Daniela S. Fowlera,
+balíček `minimal` generujeme my a spadá pod MIT ako zvyšok. Podrobnosti a overenie pôvodu:
+`NOTICE` a `ASSETS.md`.
+
 ## Štruktúra
 
 | Priečinok | Obsah | Pravidlá |
