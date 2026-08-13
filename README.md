@@ -7,8 +7,7 @@ bez účtov — izby sa vytvárajú anonymne a zdieľajú kódom.
 
 ## Vzhľad a nastavenia
 
-Rozhranie vychádza z návrhu **Durak Stôl** z Claude Design. Stôl je oválny a vždy sa
-točí tak, aby si sedel dole: tvoja ruka je rozložená do vejára pozdĺž spodnej hrany
+Stôl je oválny a vždy sa točí tak, aby si sedel dole: tvoja ruka je rozložená do vejára pozdĺž spodnej hrany
 a pod pointerom sa karty nadvihujú, súperi sedia po obvode ako menovky s avatarom,
 rolou a počtom kariet, balík leží naľavo od kariet v hre. Pod stolom sú tlačidlá
 a jeden riadok s tvojím menom, rolou, tromfom a počtom kariet. Vpravo pláva

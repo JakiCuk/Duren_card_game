@@ -277,7 +277,7 @@ function choose(
 /**
  * How much a move misleads, in the same units as the evaluation.
  *
- * The design called for running our own belief code from the opponent's seat
+ * The plan called for running our own belief code from the opponent's seat
  * and measuring how far their posterior moves away from the truth. What is
  * implemented instead is the four named bluffs that the measurement would have
  * produced anyway, scored directly. It is far cheaper, and — unlike a number

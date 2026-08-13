@@ -1,9 +1,9 @@
 /**
  * Draws the "minimal" deck: a rank in the corner, one large suit in the middle.
  *
- * It exists because the Claude Design mock offered a drawn alternative to the
- * photographic Tek Eye faces, and a second deck is the cheapest way to prove the
- * theme seam actually holds — the game names a `CardId` and never a file.
+ * A drawn alternative to the photographic Tek Eye faces, and the cheapest way
+ * to prove the theme seam actually holds — the game names a `CardId` and never
+ * a file, so a second deck should cost one entry in a list.
  *
  * Ranks keep their usual letters (J, Q, K, A), not the Slovak D for dáma: both
  * decks must name the same card the same way, or the two would disagree about

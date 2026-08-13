@@ -1,14 +1,14 @@
 /* ==========================================================================
-   Duren — visual system ported from the Claude Design project "Durak Stôl".
+   Duren — the visual system.
 
    Three skins (Organic / Modern / Klasik) × two themes, driven entirely by
    custom properties set on the app root. Nothing below reads a colour
    literal outside the token blocks, so a fourth skin is a block of
    variables and no component changes.
 
-   One deliberate departure from the mock: the playing cards stay as they
-   are — real SVG faces from the Tek Eye deck — instead of the glyph cards
-   the design drew for itself. Everything around them follows the design.
+   The playing cards are the one thing the skins do not touch: they are real
+   SVG faces, and a card that changed colour with the furniture would stop
+   being a card you can read at a glance.
    ========================================================================== */
 
 /* --- tokens: Organic (default skin) --------------------------------------- */

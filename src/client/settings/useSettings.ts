@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useState } from 'react';
 import { readStored, writeStored } from '../storage.js';
 
-/** The three looks the design ships. Cards are the same SVGs in all of them. */
+/** The three looks on offer. Cards are the same SVGs in all of them. */
 export const SKINS = ['organic', 'modern', 'classic'] as const;
 export type Skin = (typeof SKINS)[number];
 

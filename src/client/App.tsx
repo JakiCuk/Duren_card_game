@@ -362,9 +362,9 @@ function OnlineGame({ mode, setMode, settings, set }: ModeProps) {
 /**
  * The way in: a name, and either a new room or somebody else's code.
  *
- * No account, no password — the design's sign-in column becomes the two things
- * this game actually needs, because inventing a login for a room that lives in
- * server memory would be theatre.
+ * No account, no password: inventing a login for a room that lives in server
+ * memory would be theatre, so the way in is the two things the game actually
+ * needs — who you are at the table, and which table.
  */
 function Entry({
   name,
