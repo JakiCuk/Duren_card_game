@@ -33,6 +33,28 @@ const socketUrl = (): string => {
  * back and the server puts the player in the seat they left, which is why a
  * refresh mid-game is not a disaster.
  */
+/**
+ * Lets go of a socket, whatever state it is in.
+ *
+ * Closing one that has not finished its handshake is legal — the browser just
+ * abandons the attempt — but the `ws` package the tests run against reports it
+ * as an error, and a slower machine hits that window every time React mounts
+ * the effect twice. So a connecting socket is left to open and told to close
+ * itself the moment it does. The reference is already gone by then, so nothing
+ * can reach it either way.
+ */
+function discard(ws: WebSocket | null): void {
+  if (ws === null) return;
+  ws.onmessage = null;
+  ws.onclose = null;
+  if (ws.readyState === WebSocket.CONNECTING) {
+    ws.onopen = () => ws.close();
+    return;
+  }
+  ws.onopen = null;
+  ws.close();
+}
+
 export function useOnline(enabled: boolean) {
   const [state, setState] = useState<OnlineState>({
     connection: 'offline',
@@ -116,7 +138,7 @@ export function useOnline(enabled: boolean) {
       if (reconnectTimer !== undefined) clearTimeout(reconnectTimer);
       const live = socket.current;
       socket.current = null;
-      live?.close();
+      discard(live);
     };
   }, [enabled]);
 
