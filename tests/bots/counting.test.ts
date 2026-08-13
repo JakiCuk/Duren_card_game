@@ -13,7 +13,7 @@ import {
   type PlayerView,
   type Seat,
 } from '../../src/engine/index.js';
-import { duel } from '../../tools/duel.js';
+import { duelInChunks } from './chunked.js';
 import { playBotGame, playGame } from '../../tools/sim.js';
 import { createLevel2 } from '../../src/bots/level2.js';
 import { makeState } from '../engine/helpers.js';
@@ -253,8 +253,8 @@ describe('level 3', () => {
     }
   });
 
-  it('beats level 2 by a clear margin', () => {
-    const r = duel(
+  it('beats level 2 by a clear margin', async () => {
+    const r = await duelInChunks(
       (seat, seed) => createLevel3(seat, seed),
       (seat, seed) => createLevel2(seat, seed),
       160,

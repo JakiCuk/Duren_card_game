@@ -17,7 +17,7 @@ import {
   type Seat,
 } from '../../src/engine/index.js';
 import { DEFAULT_RULES } from '../../src/shared/rules.js';
-import { duel } from '../../tools/duel.js';
+import { duelInChunks } from './chunked.js';
 import { playBotGame } from '../../tools/sim.js';
 import { makeState } from '../engine/helpers.js';
 
@@ -190,10 +190,10 @@ describe('level 2', () => {
 });
 
 describe('strength ladder', () => {
-  it('level 2 beats level 1 by a clear margin', () => {
+  it('level 2 beats level 1 by a clear margin', async () => {
     // Paired seeds: every deal is played twice with the seats swapped, so the
     // luck of the deal cancels and only the policies are being compared.
-    const r = duel(createLevel2, createLevel1, 600, DEFAULT_RULES);
+    const r = await duelInChunks(createLevel2, createLevel1, 600, DEFAULT_RULES);
     expect(r.aScore).toBeGreaterThan(0.55);
     // The lower end of the confidence interval, not the point estimate — that
     // is what makes this a regression guard rather than a coin flip.

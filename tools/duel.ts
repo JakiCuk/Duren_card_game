@@ -30,12 +30,18 @@ export function duel(
   b: BotFactory,
   games: number,
   config: RuleConfig = DEFAULT_RULES,
+  /**
+   * Seed of the first deal. Only useful for running one long duel as several
+   * short ones — a chunk that repeated seeds 0..n would measure the same games
+   * over and over and report a confidence interval it has not earned.
+   */
+  from = 0,
 ): DuelResult {
   let aLosses = 0;
   let bLosses = 0;
   let draws = 0;
 
-  for (let i = 0; i < games; i++) {
+  for (let i = from; i < from + games; i++) {
     for (const swapped of [false, true]) {
       const factories = swapped ? [b, a] : [a, b];
       const bots = factories.map((make, seat) => make(seat, `${i}:${seat}`));

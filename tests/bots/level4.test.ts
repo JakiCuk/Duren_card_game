@@ -10,7 +10,7 @@ import {
   type Seat,
 } from '../../src/engine/index.js';
 import { seedRng } from '../../src/engine/rng.js';
-import { duel } from '../../tools/duel.js';
+import { duelInChunks } from './chunked.js';
 import { playBotGame, playGame } from '../../tools/sim.js';
 import { makeState } from '../engine/helpers.js';
 
@@ -273,8 +273,8 @@ describe('level 4', () => {
     expect(worst).toBeLessThan(1500);
   }, 60_000);
 
-  it('beats level 3 by a clear margin', () => {
-    const r = duel(createLevel4, createLevel3, 60);
+  it('beats level 3 by a clear margin', async () => {
+    const r = await duelInChunks(createLevel4, createLevel3, 60);
     expect(r.aScore).toBeGreaterThan(0.55);
   }, 300_000);
 
