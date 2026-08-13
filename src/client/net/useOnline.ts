@@ -3,9 +3,10 @@ import type { Move, PlayerView, PublicEvent } from '../../engine/index.js';
 import type { C2S, ChatLine, ErrorCode, RoomState, S2C } from '../../shared/protocol.js';
 import type { RuleConfig } from '../../shared/rules.js';
 import { PROTOCOL_VERSION } from '../../shared/version.js';
+import { readStored, writeStored } from '../storage.js';
 
-const TOKEN_KEY = 'durak.token';
-const NAME_KEY = 'durak.name';
+const TOKEN_KEY = 'token';
+const NAME_KEY = 'name';
 
 export type ConnectionState = 'connecting' | 'online' | 'offline';
 
@@ -91,7 +92,7 @@ export function useOnline(enabled: boolean) {
       ws.onopen = () => {
         retry.current = 0;
         setState((s) => ({ ...s, connection: 'online', error: null }));
-        const token = localStorage.getItem(TOKEN_KEY);
+        const token = readStored(TOKEN_KEY);
         ws.send(
           JSON.stringify({
             t: 'hello',
@@ -144,11 +145,11 @@ export function useOnline(enabled: boolean) {
 
   const api = {
     createRoom: (name: string, config: RuleConfig) => {
-      localStorage.setItem(NAME_KEY, name);
+      writeStored(NAME_KEY, name);
       send({ t: 'room.create', name, config });
     },
     joinRoom: (code: string, name: string) => {
-      localStorage.setItem(NAME_KEY, name);
+      writeStored(NAME_KEY, name);
       send({ t: 'room.join', code, name });
     },
     leaveRoom: () => send({ t: 'room.leave' }),
@@ -162,7 +163,7 @@ export function useOnline(enabled: boolean) {
     resync: () => send({ t: 'game.resync' }),
     sendChat: (text: string) => send({ t: 'chat', text }),
     clearError: () => setState((s) => ({ ...s, error: null })),
-    savedName: (): string => localStorage.getItem(NAME_KEY) ?? '',
+    savedName: (): string => readStored(NAME_KEY) ?? '',
   };
 
   return { ...state, ...api };
@@ -171,7 +172,7 @@ export function useOnline(enabled: boolean) {
 function reduce(state: OnlineState, message: S2C): OnlineState {
   switch (message.t) {
     case 'hello.ok':
-      localStorage.setItem(TOKEN_KEY, message.token);
+      writeStored(TOKEN_KEY, message.token);
       return { ...state, playerId: message.playerId, room: message.room, error: null };
 
     case 'room.state':

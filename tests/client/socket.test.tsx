@@ -144,7 +144,7 @@ describe('the online socket', () => {
       }),
     );
 
-    expect(localStorage.getItem('durak.token')).toBe('abc123');
+    expect(localStorage.getItem('duren.token')).toBe('abc123');
     expect(result.current.playerId).toBe('p1');
   });
 

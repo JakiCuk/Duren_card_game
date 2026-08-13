@@ -11,4 +11,4 @@ export const PROTOCOL_VERSION = 1;
  * `/healthz` of a deployment then print the same string, so "is what I am
  * looking at what I deployed?" is a comparison rather than an investigation.
  */
-export const APP_VERSION = '20260813.0151';
+export const APP_VERSION = '20260813.0247';

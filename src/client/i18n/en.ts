@@ -1,7 +1,7 @@
 import type { Dictionary } from './core.js';
 
 export const en: Dictionary = {
-  'app.title': 'Durak',
+  'app.title': 'Duren',
   'app.cardsCredit':
     'Cards: SVG Playing Cards by Daniel S. Fowler (tekeye.uk), CC0 / public domain.',
 
@@ -100,7 +100,7 @@ export const en: Dictionary = {
   'rules.teams.hint': 'Four players, partners opposite. Partners never attack or transfer to each other.',
   'team.name': 'Team {n}',
   'banner.teamLost': '{team} loses.',
-  'banner.durak': '{name} is the durak.',
+  'banner.durak': '{name} is the duren.',
 
   'log.title': 'What happened',
   'log.dealt': 'Dealt. Trump card: {card}.',
@@ -118,7 +118,7 @@ export const en: Dictionary = {
   'log.out': '{name} is out of cards.',
   'log.stalemate': 'Stalemate — the game stopped going anywhere.',
   'log.drawGame': 'A draw — nobody is the fool.',
-  'log.durak': 'Durak: {name}.',
+  'log.durak': 'Duren: {name}.',
 
   'bots.hint.none': 'Every seat is a person at this device.',
   'bots.1.name': 'Beginner',
@@ -172,7 +172,7 @@ export const en: Dictionary = {
   'rules.trumpVisible': 'Trump card face up',
   'rules.trumpVisible.hint': 'The bottom card of the deck lies face up.',
 
-  'preset.classic': 'Classic durak',
+  'preset.classic': 'Classic duren',
   'preset.classic.blurb': '36 cards, anyone may throw in, the defender may take at any time.',
   'preset.perevodnoy': 'With transfers',
   'preset.perevodnoy.blurb':
@@ -233,7 +233,7 @@ export const en: Dictionary = {
   'theme.light': 'Day',
   'theme.dark': 'Night',
   'entry.kicker': 'Welcome to the table',
-  'entry.title': 'Play some durak.',
+  'entry.title': 'Play some duren.',
   'entry.botsKicker': 'Opponents',
   'entry.botsTitle': 'Bots you can seat at the table',
   'lobby.waitingTitle': 'Waiting for players',

@@ -3,6 +3,7 @@ import { LOCALES, translate, type Dictionary, type Locale, type Params } from '.
 import { en } from './en.js';
 import { sk } from './sk.js';
 import { uk } from './uk.js';
+import { readStored, writeStored } from '../storage.js';
 
 export type { Locale, Params };
 export { LOCALES };
@@ -15,7 +16,7 @@ export const LOCALE_NAMES: Record<Locale, string> = {
   en: 'English',
 };
 
-const STORAGE_KEY = 'durak.locale';
+const STORAGE_KEY = 'locale';
 
 const isLocale = (value: string | null): value is Locale =>
   value !== null && (LOCALES as readonly string[]).includes(value);
@@ -23,7 +24,7 @@ const isLocale = (value: string | null): value is Locale =>
 /** Saved choice first, then the browser's preference, then Slovak. */
 export function detectLocale(): Locale {
   if (typeof window === 'undefined') return 'sk';
-  const saved = window.localStorage.getItem(STORAGE_KEY);
+  const saved = readStored(STORAGE_KEY);
   if (isLocale(saved)) return saved;
   for (const candidate of window.navigator.languages ?? []) {
     const base = candidate.split('-')[0];
@@ -47,7 +48,7 @@ export function I18nProvider({ children, initial }: { children: ReactNode; initi
 
   const setLocale = useCallback((next: Locale) => {
     setLocaleState(next);
-    if (typeof window !== 'undefined') window.localStorage.setItem(STORAGE_KEY, next);
+    writeStored(STORAGE_KEY, next);
   }, []);
 
   // Screen readers and browser features (hyphenation, spellcheck) key off this.

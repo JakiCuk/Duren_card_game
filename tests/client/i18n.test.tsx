@@ -93,7 +93,7 @@ describe('the app in three languages', () => {
 
   it('starts in the language it is given', () => {
     renderApp(localeOf('uk'));
-    expect(screen.getByRole('heading', { name: 'Дурак' })).toBeTruthy();
+    expect(screen.getByRole('heading', { name: 'Дурень' })).toBeTruthy();
     expect(screen.getByRole('button', { name: 'На цьому пристрої' })).toBeTruthy();
   });
 
@@ -113,7 +113,7 @@ describe('the app in three languages', () => {
     await user.selectOptions(screen.getByLabelText('Jazyk'), 'en');
 
     expect(screen.getByRole('button', { name: 'New game' })).toBeTruthy();
-    expect(screen.getByRole('heading', { name: 'Durak' })).toBeTruthy();
+    expect(screen.getByRole('heading', { name: 'Duren' })).toBeTruthy();
     // The board is still the same board, not a fresh deal.
     expect(document.querySelectorAll('.seat .hand .card img').length).toBe(cardsBefore);
   });
@@ -122,7 +122,7 @@ describe('the app in three languages', () => {
     const user = userEvent.setup();
     renderApp('sk');
     await user.selectOptions(screen.getByLabelText('Jazyk'), 'uk');
-    expect(localStorage.getItem('durak.locale')).toBe('uk');
+    expect(localStorage.getItem('duren.locale')).toBe('uk');
   });
 
   it('tells the browser which language the page is in', async () => {

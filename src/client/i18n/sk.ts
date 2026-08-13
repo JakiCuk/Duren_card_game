@@ -2,7 +2,7 @@ import type { Dictionary } from './core.js';
 
 /** Slovak is the reference dictionary: every other locale must match its keys. */
 export const sk: Dictionary = {
-  'app.title': 'Durak',
+  'app.title': 'Duren',
   'app.cardsCredit':
     'Karty: SVG Playing Cards od Daniela S. Fowlera (tekeye.uk), CC0 / public domain.',
 
@@ -94,13 +94,13 @@ export const sk: Dictionary = {
   'suit.hearts': 'Srdcia',
   'suit.spades': 'Piky',
 
-  'banner.stalemate': 'Patová pozícia — karty len kolovali dokola, nikto nie je durak.',
+  'banner.stalemate': 'Patová pozícia — karty len kolovali dokola, nikto nie je duren.',
   'banner.draw': 'Remíza — všetci sa zbavili kariet naraz.',
   'rules.teams': 'Tímy 2v2',
   'rules.teams.hint': 'Štyria hráči, dvojice oproti sebe. Spoluhráči na seba neútočia ani neprehadzujú.',
   'team.name': 'Tím {n}',
   'banner.teamLost': 'Prehráva {team}.',
-  'banner.durak': 'Durak je {name}.',
+  'banner.durak': 'Duren je {name}.',
 
   'log.title': 'Priebeh',
   'log.dealt': 'Rozdané. Tromfová karta: {card}.',
@@ -117,8 +117,8 @@ export const sk: Dictionary = {
   'log.trumpTaken': '{name} berie tromfovú kartu {card} — balík je prázdny.',
   'log.out': '{name} sa zbavil kariet.',
   'log.stalemate': 'Patová pozícia — hra sa už nikam neposúvala.',
-  'log.drawGame': 'Remíza — nikto nie je durak.',
-  'log.durak': 'Durak: {name}.',
+  'log.drawGame': 'Remíza — nikto nie je duren.',
+  'log.durak': 'Duren: {name}.',
 
   'bots.hint.none': 'Všetky miesta hrajú ľudia na jednom zariadení.',
   'bots.1.name': 'Začiatočník',
@@ -172,7 +172,7 @@ export const sk: Dictionary = {
   'rules.trumpVisible': 'Tromfová karta viditeľná',
   'rules.trumpVisible.hint': 'Spodná karta balíka leží lícom hore.',
 
-  'preset.classic': 'Klasický durak',
+  'preset.classic': 'Klasický duren',
   'preset.classic.blurb': '36 kariet, prihadzuje ktokoľvek, obranca môže kedykoľvek vziať.',
   'preset.perevodnoy': 'S prehadzovaním',
   'preset.perevodnoy.blurb':
@@ -233,7 +233,7 @@ export const sk: Dictionary = {
   'theme.light': 'Denný',
   'theme.dark': 'Nočný',
   'entry.kicker': 'Vitaj pri stole',
-  'entry.title': 'Zahraj si durák.',
+  'entry.title': 'Zahraj si duren.',
   'entry.botsKicker': 'Súperi',
   'entry.botsTitle': 'Boti, ktorých môžeš posadiť k stolu',
   'lobby.waitingTitle': 'Čakáme na hráčov',

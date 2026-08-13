@@ -91,7 +91,7 @@ const switchTo = async (user: User, name: string): Promise<void> => {
 describe('hot-seat board', () => {
   it('deals a visible game to every seat', async () => {
     await renderHotSeat(userEvent.setup());
-    expect(screen.getByRole('heading', { name: 'Durak' })).toBeTruthy();
+    expect(screen.getByRole('heading', { name: 'Duren' })).toBeTruthy();
     expect(handCards('Hráč 1')).toHaveLength(6);
     expect(handCards('Hráč 2')).toHaveLength(6);
     expect(tableCards()).toHaveLength(0);
@@ -177,7 +177,7 @@ describe('hot-seat board', () => {
     expect(handCards('Hráč 1').map((img) => img.getAttribute('alt'))).toEqual(first);
   });
 
-  it('can be played from the deal to a durak using only the UI', async () => {
+  it('can be played from the deal to a duren using only the UI', async () => {
     const user = userEvent.setup();
     await renderHotSeat(user);
 
@@ -198,7 +198,7 @@ describe('hot-seat board', () => {
       await user.click(choice!);
     }
 
-    expect(resultBanner()).toMatch(/^Durak je |^Remíza|^Patová/);
+    expect(resultBanner()).toMatch(/^Duren je |^Remíza|^Patová/);
     // Exactly one seat may still hold cards — the fool. A draw leaves none.
     const withCards = Array.from(document.querySelectorAll('.seat')).filter(
       (el) => el.querySelectorAll('.hand .card img').length > 0,
@@ -280,8 +280,8 @@ describe('rules panel', () => {
     const panel = await openRules(user);
 
     // The name shows up twice by design: as a preset button and as the summary.
-    expect(within(panel).getByRole('button', { name: 'Klasický durak' })).toBeTruthy();
-    expect(panel.querySelector('.rules__current')?.textContent).toBe('Klasický durak');
+    expect(within(panel).getByRole('button', { name: 'Klasický duren' })).toBeTruthy();
+    expect(panel.querySelector('.rules__current')?.textContent).toBe('Klasický duren');
 
     await user.click(within(panel).getByRole('button', { name: 'S prehadzovaním' }));
     expect(document.querySelector('.rules__current')?.textContent).toBe('S prehadzovaním');
@@ -371,7 +371,7 @@ describe('game settings', () => {
 
     fireEvent.change(slider, { target: { value: '2500' } });
     expect(within(panel).getByText('2.5 s')).toBeTruthy();
-    expect(JSON.parse(localStorage.getItem('durak.settings')!)).toMatchObject({
+    expect(JSON.parse(localStorage.getItem('duren.settings')!)).toMatchObject({
       botDelayMs: 2500,
     });
   });
@@ -408,7 +408,7 @@ describe('game settings', () => {
 
     expect(byPower).toHaveLength(bySuit.length);
     expect([...byPower].sort()).toEqual([...bySuit].sort());
-    expect(JSON.parse(localStorage.getItem('durak.settings')!)).toMatchObject({ sortBy: 'power' });
+    expect(JSON.parse(localStorage.getItem('duren.settings')!)).toMatchObject({ sortBy: 'power' });
   });
 
   it('stops shading the unplayable cards when hints are off', async () => {
@@ -421,7 +421,7 @@ describe('game settings', () => {
     expect(muted()).toBe(0);
 
     await user.click(within(panel).getByLabelText(/Nápoveda ťahu/));
-    expect(JSON.parse(localStorage.getItem('durak.settings')!)).toMatchObject({ hints: true });
+    expect(JSON.parse(localStorage.getItem('duren.settings')!)).toMatchObject({ hints: true });
   });
 
   it('offers a second deck and draws the table with it', async () => {
@@ -453,7 +453,7 @@ describe('game settings', () => {
     const app = document.querySelector('.app')!;
     expect(app.getAttribute('data-skin')).toBe('classic');
     expect(app.getAttribute('data-theme')).toBe('dark');
-    expect(JSON.parse(localStorage.getItem('durak.settings')!)).toMatchObject({
+    expect(JSON.parse(localStorage.getItem('duren.settings')!)).toMatchObject({
       skin: 'classic',
       theme: 'dark',
     });
@@ -480,7 +480,7 @@ describe('game settings', () => {
       }
     }
     // Not every deal reaches a throw-in decision; the setting is still wired.
-    expect(JSON.parse(localStorage.getItem('durak.settings')!)).toMatchObject({
+    expect(JSON.parse(localStorage.getItem('duren.settings')!)).toMatchObject({
       holdForThrowIn: true,
     });
   }, 30_000);

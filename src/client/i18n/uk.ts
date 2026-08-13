@@ -1,7 +1,7 @@
 import type { Dictionary } from './core.js';
 
 export const uk: Dictionary = {
-  'app.title': 'Дурак',
+  'app.title': 'Дурень',
   'app.cardsCredit':
     'Карти: SVG Playing Cards від Daniel S. Fowler (tekeye.uk), CC0 / суспільне надбання.',
 
@@ -105,7 +105,7 @@ export const uk: Dictionary = {
   'rules.teams.hint': 'Четверо гравців, пари навпроти. Партнери не атакують і не переводять одне на одного.',
   'team.name': 'Команда {n}',
   'banner.teamLost': 'Програє {team}.',
-  'banner.durak': 'Дурак — {name}.',
+  'banner.durak': 'Дурень — {name}.',
 
   'log.title': 'Перебіг',
   'log.dealt': 'Роздано. Козирна карта: {card}.',
@@ -123,7 +123,7 @@ export const uk: Dictionary = {
   'log.out': '{name} позбувся карт.',
   'log.stalemate': 'Патова позиція — гра вже нікуди не рухалась.',
   'log.drawGame': 'Нічия — дурня немає.',
-  'log.durak': 'Дурак: {name}.',
+  'log.durak': 'Дурень: {name}.',
 
   'bots.hint.none': 'Усі місця займають люди на одному пристрої.',
   'bots.1.name': 'Початківець',
@@ -178,7 +178,7 @@ export const uk: Dictionary = {
   'rules.trumpVisible': 'Козирна карта видима',
   'rules.trumpVisible.hint': 'Нижня карта колоди лежить лицем догори.',
 
-  'preset.classic': 'Класичний дурак',
+  'preset.classic': 'Класичний дурень',
   'preset.classic.blurb': '36 карт, підкидати може будь-хто, захисник може взяти будь-коли.',
   'preset.perevodnoy': 'З переведенням',
   'preset.perevodnoy.blurb':

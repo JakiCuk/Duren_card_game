@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useState } from 'react';
+import { readStored, writeStored } from '../storage.js';
 
 /** The three looks the design ships. Cards are the same SVGs in all of them. */
 export const SKINS = ['organic', 'modern', 'classic'] as const;
@@ -55,7 +56,7 @@ export const DEFAULT_SETTINGS: Settings = {
 
 export const BOT_DELAY_RANGE = { min: 0, max: 4000, step: 100 } as const;
 
-const KEY = 'durak.settings';
+const KEY = 'settings';
 
 const isSkin = (value: unknown): value is Skin =>
   typeof value === 'string' && (SKINS as readonly string[]).includes(value);
@@ -66,7 +67,7 @@ const isSort = (value: unknown): value is SortBy =>
 function load(): Settings {
   if (typeof window === 'undefined') return DEFAULT_SETTINGS;
   try {
-    const raw = window.localStorage.getItem(KEY);
+    const raw = readStored(KEY);
     if (raw === null) return DEFAULT_SETTINGS;
     const parsed = JSON.parse(raw) as Partial<Settings>;
     return {
@@ -94,7 +95,7 @@ export function useSettings() {
   const [settings, setSettings] = useState<Settings>(load);
 
   useEffect(() => {
-    if (typeof window !== 'undefined') window.localStorage.setItem(KEY, JSON.stringify(settings));
+    writeStored(KEY, JSON.stringify(settings));
   }, [settings]);
 
   // The browser chrome (scrollbars, form controls, the address bar on mobile)

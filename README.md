@@ -1,6 +1,6 @@
-# Durak
+# Duren
 
-Webová kartová hra Durak — proti botom (4 úrovne zložitosti) aj proti živým hráčom online.
+Webová kartová hra Duren — proti botom (4 úrovne zložitosti) aj proti živým hráčom online.
 
 Jedna Node aplikácia: Fastify servíruje statický React build aj WebSocket. Bez databázy,
 bez účtov — izby sa vytvárajú anonymne a zdieľajú kódom.
@@ -105,7 +105,7 @@ musí zbiť keď môže, a či je tromfová karta viditeľná.
 `validateConfig` odmieta nedealovateľné kombinácie (36 kariet so 6 hráčmi) a varuje
 pred tými, ktoré prekvapujú (napr. „obranca musí zbiť" mení hru viac, než sa zdá).
 
-**Hra vždy skončí.** Durak vie cyklovať — traja hráči, z ktorých každý nevie zbiť
+**Hra vždy skončí.** Duren vie cyklovať — traja hráči, z ktorých každý nevie zbiť
 útok toho ďalšieho, si môžu kartu podávať dokola donekonečna. Ľudia to prelomia tým,
 že zahrajú inak; deterministickí boti nie a serverová izba by zamrzla. Preto je
 `MAX_BOUTS_WITHOUT_PROGRESS` súčasťou pravidiel: po 32 kolách bez toho, aby karta
@@ -160,7 +160,7 @@ botom zmerať nedá.
 ```bash
 pnpm build && pnpm start          # všetko na jednom porte: http://localhost:3000
 # alebo
-docker build -t durak . && docker run -p 3000:3000 durak
+docker build -t duren . && docker run -p 3000:3000 duren
 ```
 
 V produkcii Fastify servíruje aj statický build aj WebSocket, takže žiadne proxy
